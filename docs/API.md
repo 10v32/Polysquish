@@ -132,3 +132,79 @@ Squish `result` when done:
 }
 ```
 `weld_tolerance`, `max_error` and `floater_min_fraction` are fractions of the bounding-box diagonal.
+
+---
+
+# V2 additions
+
+## `GET /api/health` (extended)
+```json
+{ "version": "0.2.0", "threads": 8, "output_root": "...",
+  "gpu": { "available": true, "name": "Apple M2" } }        // name null when CPU only
+```
+
+## Presets
+A new preset `character` (id `character`, icon `person`) appears before `hero`.
+
+## Recipe (new fields, all optional; defaults shown)
+```json
+"cleanup":  { ..., "remove_hidden": true, "hidden_samples": 48 },
+"decimate": { ..., "chunk_threshold": 1500000, "keep_materials": false },
+"retopo":   { "mode": "triangles",          // triangles | quad_dominant | voxel
+              "voxel_resolution": 256, "voxel_keep_fraction": 1.0 },
+"bake":     { ..., "hard_edge_angle": 60, "ao_denoise": true, "gpu": true },
+"lods":     { ..., "imposter": false, "imposter_resolution": 1024 },
+"export":   { ..., "fbx": true, "skin": true }
+```
+
+## Squish result (new fields)
+```json
+"metrics": {
+  "deviation": { "mean": 0.0008, "max": 0.0061, "p95": 0.0021, "unit": "fraction_of_size",
+                 "mean_abs": 0.0014, "max_abs": 0.011 },
+  "texel_density": { "mean": 1024.5, "min": 310.2, "max": 2210.0, "unit": "texels_per_unit" },
+  "uv_charts": 61, "quads": 0, "polygons": 4999, "watertight": true,
+  "hidden_faces_removed": 12034, "tracer": "gpu"
+},
+"rig": { "joints": 42, "animations": ["Idle", "Walk"] } | null,
+"preview": {
+  "source": "/api/jobs/j_02/preview/source.glb",
+  "result": "/api/jobs/j_02/preview/result.glb",
+  "heatmap_deviation": "/api/jobs/j_02/preview/heatmap_deviation.glb",   // vertex-coloured LOD0
+  "heatmap_density":   "/api/jobs/j_02/preview/heatmap_density.glb"      // may be null
+}
+```
+Heat-maps use a fixed ramp: blue (0) → mint → amber → coral (max). `files[].kind` gains
+`fbx`, `imposter` (atlas PNGs + card mesh) and `heatmap`.
+
+## Batch
+### `POST /api/batch`
+```json
+{ "upload_ids": ["u_1", "u_2"], "recipe": Recipe, "output_dir": null }
+```
+→ `{ "batch_id": "b_01", "job_ids": ["j_10", "j_11"] }`. Jobs run **one at a time** in order.
+### `GET /api/batch/{id}` → `{ "id", "job_ids", "done": 1, "total": 2, "status": "running" }`
+### `GET /api/jobs` lists every job (queued ones have `status: "queued"`), newest last.
+
+## Watch folders
+### `POST /api/watch`
+```json
+{ "folder": "/Users/me/Downloads/meshy", "output_dir": null, "recipe": Recipe, "preset": "prop" }
+```
+→ `{ "watch_id": "w_01" }`. New supported files appearing in `folder` (and already present ones
+that have no output yet) are queued automatically once their size stops changing.
+Outputs go to `<output_dir or output_root>/<file stem>/`.
+### `GET /api/watch` → `[{ "id", "folder", "output_dir", "preset", "processed": 3, "queued": 1, "job_ids": [...], "active": true }]`
+### `DELETE /api/watch/{id}` → `{ "ok": true }`
+
+## File browser (for picking folders/paths from the UI)
+### `GET /api/fs?path=/some/dir`
+```json
+{ "path": "/some/dir", "parent": "/some",
+  "dirs": ["assets", "exports"],
+  "files": [ { "name": "robot.glb", "size_bytes": 1234, "supported": true } ] }
+```
+Omit `path` for the user's home directory.
+
+## Open output folder
+### `POST /api/open-folder` `{ "path": "/abs/output/dir" }` → `{ "ok": true }` (only folders Polysquish created).

@@ -96,6 +96,7 @@ pub fn simplified(mesh: &Mesh, triangles: usize) -> Option<Mesh> {
         preserve_uvs: false,
         preserve_colors: false,
         aggressive: false,
+        ..Default::default()
     };
     let mut src = mesh.clone();
     src.uvs.clear();

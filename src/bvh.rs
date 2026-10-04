@@ -329,4 +329,140 @@ impl Bvh {
     pub fn node_count(&self) -> usize {
         self.nodes.len()
     }
+
+    pub fn triangle_count(&self) -> usize {
+        self.tris.len()
+    }
+
+    #[inline]
+    fn aabb_dist2(bmin: Vec3, bmax: Vec3, p: Vec3) -> f32 {
+        let d = (bmin - p).max(Vec3::ZERO).max(p - bmax);
+        d.length_squared()
+    }
+
+    /// Closest point on a triangle (Ericson, Real-Time Collision Detection). Returns (point, u, v).
+    #[inline]
+    fn closest_on_tri(tri: &Tri, p: Vec3) -> (Vec3, f32, f32) {
+        let a = tri.p0;
+        let ab = tri.e1;
+        let ac = tri.e2;
+        let ap = p - a;
+        let d1 = ab.dot(ap);
+        let d2 = ac.dot(ap);
+        if d1 <= 0.0 && d2 <= 0.0 {
+            return (a, 0.0, 0.0);
+        }
+        let b = a + ab;
+        let bp = p - b;
+        let d3 = ab.dot(bp);
+        let d4 = ac.dot(bp);
+        if d3 >= 0.0 && d4 <= d3 {
+            return (b, 1.0, 0.0);
+        }
+        let vc = d1 * d4 - d3 * d2;
+        if vc <= 0.0 && d1 >= 0.0 && d3 <= 0.0 {
+            let v = d1 / (d1 - d3);
+            return (a + ab * v, v, 0.0);
+        }
+        let c = a + ac;
+        let cp = p - c;
+        let d5 = ab.dot(cp);
+        let d6 = ac.dot(cp);
+        if d6 >= 0.0 && d5 <= d6 {
+            return (c, 0.0, 1.0);
+        }
+        let vb = d5 * d2 - d1 * d6;
+        if vb <= 0.0 && d2 >= 0.0 && d6 <= 0.0 {
+            let w = d2 / (d2 - d6);
+            return (a + ac * w, 0.0, w);
+        }
+        let va = d3 * d6 - d5 * d4;
+        if va <= 0.0 && (d4 - d3) >= 0.0 && (d5 - d6) >= 0.0 {
+            let w = (d4 - d3) / ((d4 - d3) + (d5 - d6));
+            return (b + (c - b) * w, 1.0 - w, w);
+        }
+        let denom = 1.0 / (va + vb + vc);
+        let v = vb * denom;
+        let w = vc * denom;
+        (a + ab * v + ac * w, v, w)
+    }
+
+    /// Closest surface point to `p` within `max_dist`. Returns a `Hit` whose `t` is the distance,
+    /// plus the point itself.
+    pub fn closest_point(&self, p: Vec3, max_dist: f32) -> Option<(Hit, Vec3)> {
+        if self.nodes.is_empty() {
+            return None;
+        }
+        let mut best_d2 = max_dist * max_dist;
+        let mut best: Option<(Hit, Vec3)> = None;
+        let mut stack: [(u32, f32); 64] = [(0, 0.0); 64];
+        let mut sp = 1usize;
+        stack[0] = (0, Self::aabb_dist2(self.nodes[0].bmin, self.nodes[0].bmax, p));
+        while sp > 0 {
+            sp -= 1;
+            let (ni, d2) = stack[sp];
+            if d2 > best_d2 {
+                continue;
+            }
+            let node = &self.nodes[ni as usize];
+            if node.count > 0 {
+                for k in node.first..node.first + node.count {
+                    let ti = self.tri_order[k as usize];
+                    let (q, u, v) = Self::closest_on_tri(&self.tris[ti as usize], p);
+                    let dd = (q - p).length_squared();
+                    if dd < best_d2 {
+                        best_d2 = dd;
+                        best = Some((Hit { t: dd.sqrt(), tri: ti, u, v }, q));
+                    }
+                }
+            } else {
+                let l = node.first as usize;
+                let r = l + 1;
+                let dl = Self::aabb_dist2(self.nodes[l].bmin, self.nodes[l].bmax, p);
+                let dr = Self::aabb_dist2(self.nodes[r].bmin, self.nodes[r].bmax, p);
+                // Push the farther child first so the nearer one is processed next.
+                let (near, dn, far, df) = if dl <= dr { (l, dl, r, dr) } else { (r, dr, l, dl) };
+                if df <= best_d2 && sp < 62 {
+                    stack[sp] = (far as u32, df);
+                    sp += 1;
+                }
+                if dn <= best_d2 && sp < 62 {
+                    stack[sp] = (near as u32, dn);
+                    sp += 1;
+                }
+            }
+        }
+        best
+    }
+}
+
+/// A ray for batched tracing.
+#[derive(Clone, Copy, Debug)]
+pub struct Ray {
+    pub origin: Vec3,
+    pub dir: Vec3,
+    pub tmax: f32,
+}
+
+/// Anything that can answer batches of ray queries (CPU BVH, GPU compute, ...).
+pub trait RayTracer: Sync + Send {
+    fn name(&self) -> &str;
+    /// Closest hit per ray.
+    fn closest_hits(&self, rays: &[Ray]) -> Vec<Option<Hit>>;
+    /// Whether anything blocks each ray within its `tmax`.
+    fn any_hits(&self, rays: &[Ray]) -> Vec<bool>;
+}
+
+impl RayTracer for Bvh {
+    fn name(&self) -> &str {
+        "cpu"
+    }
+    fn closest_hits(&self, rays: &[Ray]) -> Vec<Option<Hit>> {
+        use rayon::prelude::*;
+        rays.par_iter().with_min_len(256).map(|r| self.intersect(r.origin, r.dir, r.tmax)).collect()
+    }
+    fn any_hits(&self, rays: &[Ray]) -> Vec<bool> {
+        use rayon::prelude::*;
+        rays.par_iter().with_min_len(256).map(|r| self.occluded(r.origin, r.dir, r.tmax)).collect()
+    }
 }

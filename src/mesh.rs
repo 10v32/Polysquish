@@ -15,7 +15,17 @@ pub struct Mesh {
     pub colors: Vec<[f32; 4]>,
     pub indices: Vec<u32>,
     pub material_ids: Vec<u32>,
+    /// Optional polygon list for quad-dominant meshes: `[a,b,c,d]` with `d == NO_VERTEX` for a
+    /// triangle. When non-empty, `indices` must be the fan triangulation of these polygons in the
+    /// same order (quads as `(a,b,c),(a,c,d)`). Writers that understand polygons use this.
+    pub polygons: Vec<[u32; 4]>,
+    /// Skinning: up to four joint indices and weights per vertex (empty when unskinned).
+    pub joints: Vec<[u16; 4]>,
+    pub weights: Vec<[f32; 4]>,
 }
+
+/// Marker for the unused fourth corner of a triangle inside `Mesh::polygons`.
+pub const NO_VERTEX: u32 = u32::MAX;
 
 #[derive(Clone, Debug, Copy, PartialEq, Serialize, Deserialize)]
 pub struct Bounds {
@@ -46,6 +56,35 @@ impl Mesh {
     }
     pub fn has_colors(&self) -> bool {
         !self.colors.is_empty()
+    }
+    pub fn has_skin(&self) -> bool {
+        !self.joints.is_empty() && self.joints.len() == self.weights.len()
+    }
+    pub fn has_polygons(&self) -> bool {
+        !self.polygons.is_empty()
+    }
+    pub fn quad_count(&self) -> usize {
+        self.polygons.iter().filter(|p| p[3] != NO_VERTEX).count()
+    }
+
+    /// Rebuild `indices` from `polygons` (fan triangulation, quads as (a,b,c),(a,c,d)).
+    pub fn triangulate_polygons(&mut self) {
+        if self.polygons.is_empty() {
+            return;
+        }
+        let mut idx = Vec::with_capacity(self.polygons.len() * 6);
+        for p in &self.polygons {
+            idx.extend_from_slice(&[p[0], p[1], p[2]]);
+            if p[3] != NO_VERTEX {
+                idx.extend_from_slice(&[p[0], p[2], p[3]]);
+            }
+        }
+        self.indices = idx;
+    }
+
+    /// Drop the polygon list (after an operation that only tracked triangles).
+    pub fn clear_polygons(&mut self) {
+        self.polygons.clear();
     }
     #[inline]
     pub fn tri(&self, t: usize) -> [u32; 3] {
@@ -154,6 +193,7 @@ impl Mesh {
         }
         self.indices = new_indices;
         self.material_ids = new_mats;
+        self.polygons.clear();
         self.compact();
     }
 
@@ -196,8 +236,17 @@ impl Mesh {
         self.normals = gather(&self.normals, remap, new_count);
         self.uvs = gather(&self.uvs, remap, new_count);
         self.colors = gather(&self.colors, remap, new_count);
+        self.joints = gather(&self.joints, remap, new_count);
+        self.weights = gather(&self.weights, remap, new_count);
         for i in &mut self.indices {
             *i = remap[*i as usize];
+        }
+        for p in &mut self.polygons {
+            for k in 0..4 {
+                if p[k] != NO_VERTEX {
+                    p[k] = remap[p[k] as usize];
+                }
+            }
         }
     }
 
@@ -230,8 +279,26 @@ impl Mesh {
         merge(&mut self.normals, &other.normals, al, bl);
         merge(&mut self.uvs, &other.uvs, al, bl);
         merge(&mut self.colors, &other.colors, al, bl);
+        merge(&mut self.joints, &other.joints, al, bl);
+        merge(&mut self.weights, &other.weights, al, bl);
         self.positions.extend_from_slice(&other.positions);
         self.indices.extend(other.indices.iter().map(|i| i + base));
+        if self.has_polygons() || other.has_polygons() {
+            // Keep polygon lists consistent: expand whichever side has none into triangles.
+            if self.polygons.is_empty() {
+                let n = tri_before;
+                self.polygons = (0..n).map(|t| [self.indices[t * 3], self.indices[t * 3 + 1], self.indices[t * 3 + 2], NO_VERTEX]).collect();
+            }
+            if other.polygons.is_empty() {
+                for t in 0..other.triangle_count() {
+                    self.polygons.push([other.indices[t * 3] + base, other.indices[t * 3 + 1] + base, other.indices[t * 3 + 2] + base, NO_VERTEX]);
+                }
+            } else {
+                for p in &other.polygons {
+                    self.polygons.push([p[0] + base, p[1] + base, p[2] + base, if p[3] == NO_VERTEX { NO_VERTEX } else { p[3] + base }]);
+                }
+            }
+        }
         if !self.material_ids.is_empty() || !other.material_ids.is_empty() || material_offset != 0 {
             if self.material_ids.is_empty() {
                 self.material_ids = vec![0; tri_before];
@@ -325,7 +392,42 @@ impl Default for Material {
     }
 }
 
-/// A loaded model: one merged mesh plus its materials and textures.
+/// A joint of a skeleton, in the order referenced by `Mesh::joints`.
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct Joint {
+    pub name: String,
+    /// Index into `Skeleton::joints`, or None for a root.
+    pub parent: Option<usize>,
+    /// Local transform relative to the parent (column-major 4x4).
+    pub local: [[f32; 4]; 4],
+    pub inverse_bind: [[f32; 4]; 4],
+}
+
+#[derive(Clone, Debug, Default, Serialize, Deserialize)]
+pub struct Skeleton {
+    pub joints: Vec<Joint>,
+}
+
+/// One animated property track, kept verbatim from the source (glTF semantics).
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct AnimationChannel {
+    pub joint: usize,
+    /// "translation" | "rotation" | "scale"
+    pub path: String,
+    /// "LINEAR" | "STEP" | "CUBICSPLINE"
+    pub interpolation: String,
+    pub times: Vec<f32>,
+    /// Flat values: 3 per key for translation/scale, 4 for rotation (×3 for cubic spline).
+    pub values: Vec<f32>,
+}
+
+#[derive(Clone, Debug, Default, Serialize, Deserialize)]
+pub struct Animation {
+    pub name: String,
+    pub channels: Vec<AnimationChannel>,
+}
+
+/// A loaded model: one merged mesh plus its materials, textures and (optionally) its rig.
 #[derive(Clone, Debug, Default)]
 pub struct Scene {
     pub name: String,
@@ -334,6 +436,8 @@ pub struct Scene {
     pub textures: Vec<Texture>,
     pub source_format: String,
     pub source_bytes: u64,
+    pub skeleton: Option<Skeleton>,
+    pub animations: Vec<Animation>,
 }
 
 impl Scene {

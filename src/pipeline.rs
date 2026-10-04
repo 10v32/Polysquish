@@ -215,6 +215,8 @@ pub fn squish(scene: &Scene, recipe: &Recipe, out_dir: &Path, name: &str, progre
         textures: scene.textures.clone(),
         source_format: scene.source_format.clone(),
         source_bytes: scene.source_bytes,
+        skeleton: scene.skeleton.clone(),
+        animations: scene.animations.clone(),
     };
     let diag = high_scene.mesh.bounds().diagonal.max(1e-9);
     progress.stage(Stage::Clean, 1.0);
@@ -474,6 +476,8 @@ pub fn squish(scene: &Scene, recipe: &Recipe, out_dir: &Path, name: &str, progre
         textures: vec![],
         source_format: scene.source_format.clone(),
         source_bytes: 0,
+        skeleton: None,
+        animations: vec![],
     };
     let report = analyze::analyze(&final_scene);
     let after_size: u64 = files

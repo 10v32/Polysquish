@@ -88,7 +88,7 @@ fn bvh_hits_the_sphere() {
 fn full_pipeline_runs_on_a_sphere() {
     let mut mesh = make_sphere(96); // ~36k triangles
     mesh.compute_smooth_normals();
-    let scene = Scene { name: "sphere".into(), mesh, materials: vec![Default::default()], textures: vec![], source_format: "test".into(), source_bytes: 0 };
+    let scene = Scene { name: "sphere".into(), mesh, materials: vec![Default::default()], textures: vec![], source_format: "test".into(), source_bytes: 0, skeleton: None, animations: vec![] };
     let mut recipe = Recipe::preset("mobile").unwrap();
     recipe.bake.resolution = 256;
     recipe.uv.resolution = 256;

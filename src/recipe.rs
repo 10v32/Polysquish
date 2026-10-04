@@ -13,6 +13,10 @@ pub struct CleanupOptions {
     /// Components with fewer than this fraction of all triangles are dropped.
     pub floater_min_fraction: f32,
     pub fix_winding: bool,
+    /// Remove faces that cannot be seen from outside (internal shells, hidden parts).
+    pub remove_hidden: bool,
+    /// Rays per face for the visibility test.
+    pub hidden_samples: u32,
 }
 
 impl Default for CleanupOptions {
@@ -24,7 +28,36 @@ impl Default for CleanupOptions {
             remove_floaters: true,
             floater_min_fraction: 0.001,
             fix_winding: true,
+            remove_hidden: true,
+            hidden_samples: 48,
         }
+    }
+}
+
+#[derive(Clone, Copy, Debug, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
+pub enum RetopoMode {
+    /// Edge-collapse decimation only (clean triangles).
+    Triangles,
+    /// Isotropic remesh projected onto the source, then paired into quads where possible.
+    QuadDominant,
+    /// Rebuild the surface from a signed distance field (watertight, fixes intersecting shells).
+    Voxel,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
+#[serde(default)]
+pub struct RetopoOptions {
+    pub mode: RetopoMode,
+    /// Voxel grid resolution along the longest axis (voxel mode, or point-cloud inputs).
+    pub voxel_resolution: u32,
+    /// Fraction of triangles kept by voxel mode before the regular decimation (0..1).
+    pub voxel_keep_fraction: f32,
+}
+
+impl Default for RetopoOptions {
+    fn default() -> Self {
+        Self { mode: RetopoMode::Triangles, voxel_resolution: 256, voxel_keep_fraction: 1.0 }
     }
 }
 
@@ -40,6 +73,10 @@ pub struct DecimateOptions {
     pub preserve_colors: bool,
     /// Use the fast "sloppy" simplifier (vertex clustering) instead of edge collapse.
     pub aggressive: bool,
+    /// Split the mesh into spatial chunks decimated in parallel when it has more triangles than this.
+    pub chunk_threshold: usize,
+    /// Keep materials separate (locks material boundaries; one UV tile per material).
+    pub keep_materials: bool,
 }
 
 impl Default for DecimateOptions {
@@ -52,6 +89,8 @@ impl Default for DecimateOptions {
             preserve_uvs: true,
             preserve_colors: true,
             aggressive: false,
+            chunk_threshold: 1_500_000,
+            keep_materials: false,
         }
     }
 }
@@ -98,6 +137,12 @@ pub struct BakeOptions {
     pub ray_distance: Option<f32>,
     pub dilation_px: u32,
     pub supersample: u32,
+    /// Dihedral angle (degrees) above which source edges are treated as hard for baking.
+    pub hard_edge_angle: f32,
+    /// Edge-aware denoise of the ambient occlusion.
+    pub ao_denoise: bool,
+    /// Try the GPU ray tracer first (falls back to CPU automatically).
+    pub gpu: bool,
 }
 
 impl Default for BakeOptions {
@@ -114,6 +159,9 @@ impl Default for BakeOptions {
             ray_distance: None,
             dilation_px: 8,
             supersample: 2,
+            hard_edge_angle: 60.0,
+            ao_denoise: true,
+            gpu: true,
         }
     }
 }
@@ -123,6 +171,10 @@ impl Default for BakeOptions {
 pub struct LodOptions {
     pub count: usize,
     pub ratios: Vec<f32>,
+    /// Add an imposter (billboard atlas + crossed cards) as the final LOD.
+    pub imposter: bool,
+    /// Imposter atlas size in pixels.
+    pub imposter_resolution: u32,
 }
 
 impl Default for LodOptions {
@@ -130,6 +182,8 @@ impl Default for LodOptions {
         Self {
             count: 3,
             ratios: vec![0.5, 0.25, 0.1],
+            imposter: false,
+            imposter_resolution: 1024,
         }
     }
 }
@@ -190,9 +244,12 @@ impl Target {
 pub struct ExportOptions {
     pub glb: bool,
     pub obj: bool,
+    pub fbx: bool,
     pub report: bool,
     pub scale: f32,
     pub target: Target,
+    /// Keep the rig and animations when the source has them.
+    pub skin: bool,
 }
 
 impl Default for ExportOptions {
@@ -200,9 +257,11 @@ impl Default for ExportOptions {
         Self {
             glb: true,
             obj: true,
+            fbx: true,
             report: true,
             scale: 1.0,
             target: Target::Generic,
+            skin: true,
         }
     }
 }
@@ -213,6 +272,7 @@ pub struct Recipe {
     pub preset: String,
     pub cleanup: CleanupOptions,
     pub decimate: DecimateOptions,
+    pub retopo: RetopoOptions,
     pub uv: UvOptions,
     pub bake: BakeOptions,
     pub lods: LodOptions,
@@ -227,6 +287,7 @@ impl Default for Recipe {
             preset: "hero".into(),
             cleanup: Default::default(),
             decimate: Default::default(),
+            retopo: Default::default(),
             uv: Default::default(),
             bake: Default::default(),
             lods: Default::default(),
@@ -269,9 +330,9 @@ pub fn presets() -> Vec<Preset> {
     let mut mobile = Recipe::default().with_budget("mobile", 1_500, 1024);
     mobile.bake.ao = true;
     mobile.bake.metallic_roughness = false;
-    mobile.lods = LodOptions { count: 2, ratios: vec![0.5, 0.25] };
+    mobile.lods = LodOptions { count: 2, ratios: vec![0.5, 0.25], ..Default::default() };
     let mut dcc = Recipe::default().with_budget("dcc", 150_000, 4096);
-    dcc.lods = LodOptions { count: 0, ratios: vec![] };
+    dcc.lods = LodOptions { count: 0, ratios: vec![], ..Default::default() };
     dcc.collision = CollisionOptions {
         convex_hull: false,
         bbox: false,
@@ -280,8 +341,28 @@ pub fn presets() -> Vec<Preset> {
     };
     dcc.bake.ao = false;
     dcc.export.target = Target::Blender;
+    dcc.cleanup.remove_hidden = false;
+    dcc.decimate.keep_materials = true;
+    dcc.retopo.mode = RetopoMode::QuadDominant;
+    let mut character = Recipe::default().with_budget("character", 40_000, 2048);
+    character.retopo.mode = RetopoMode::QuadDominant;
+    character.export.skin = true;
+    character.lods = LodOptions { count: 2, ratios: vec![0.5, 0.25], imposter: false, imposter_resolution: 1024 };
+    let mut mobile_imposter = mobile.clone();
+    mobile_imposter.lods.imposter = true;
+    let _ = mobile_imposter;
 
     vec![
+        Preset {
+            id: "character".into(),
+            name: "Character".into(),
+            tagline: "Rigged, quad-dominant".into(),
+            description: "40k faces with quad-dominant topology, rig and animations carried over, 2K textures, 2 LODs. For things that move.".into(),
+            icon: "person".into(),
+            target_triangles: 40_000,
+            texture_size: 2048,
+            recipe: character,
+        },
         Preset {
             id: "hero".into(),
             name: "Hero asset".into(),
