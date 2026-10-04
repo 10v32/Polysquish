@@ -1,0 +1,59 @@
+[package]
+name = "polysquish"
+version = "0.1.0"
+edition = "2021"
+description = "Squish multi-million-polygon AI-generated 3D models into game-ready meshes"
+license = "MIT"
+default-run = "polysquish"
+
+[[bin]]
+name = "polysquish"
+path = "src/main.rs"
+
+[lib]
+name = "polysquish"
+path = "src/lib.rs"
+
+[dependencies]
+anyhow = "1"
+thiserror = "2"
+glam = { version = "0.33", features = ["serde", "bytemuck"] }
+rayon = "1.10"
+serde = { version = "1", features = ["derive"] }
+serde_json = { version = "1", features = ["preserve_order"] }
+clap = { version = "4", features = ["derive"] }
+image = { version = "0.25", default-features = false, features = ["png", "jpeg", "webp", "tga", "bmp"] }
+meshopt = "0.6"
+xatlas-rs-v2 = "0.1"
+mikktspace = "0.3"
+tobj = { version = "4", features = ["async"] }
+stl_io = "0.11"
+gltf = { version = "1.4", features = ["KHR_materials_emissive_strength", "extras", "names", "utils", "import"] }
+gltf-json = { version = "1.4", features = ["extras", "names"] }
+parry3d = "0.31"
+memmap2 = "0.9"
+log = "0.4"
+env_logger = "0.11"
+tokio = { version = "1", features = ["rt-multi-thread", "macros", "fs", "sync", "io-util"] }
+axum = { version = "0.8", features = ["multipart", "json"] }
+tower-http = { version = "0.6", features = ["cors"] }
+rust-embed = { version = "8", features = ["include-exclude"] }
+mime_guess = "2"
+zip = { version = "2", default-features = false, features = ["deflate"] }
+open = "5"
+dirs = "6"
+uuid = { version = "1", features = ["v4"] }
+rand = { version = "0.9", default-features = false, features = ["std", "std_rng", "small_rng"] }
+bytemuck = { version = "1", features = ["derive"] }
+
+[profile.release]
+opt-level = 3
+lto = "thin"
+codegen-units = 4
+panic = "unwind"
+
+[profile.dev]
+opt-level = 1
+
+[profile.dev.package."*"]
+opt-level = 3

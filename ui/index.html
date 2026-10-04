@@ -1,0 +1,297 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="color-scheme" content="dark">
+  <meta name="theme-color" content="#0b0716">
+  <title>Polysquish</title>
+  <meta name="description" content="Squish millions of polygons into game-ready meshes.">
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Cdefs%3E%3ClinearGradient id='g' x1='0' y1='0' x2='1' y2='1'%3E%3Cstop offset='0' stop-color='%23ff5fd2'/%3E%3Cstop offset='1' stop-color='%238b5cf6'/%3E%3C/linearGradient%3E%3C/defs%3E%3Cpath fill='url(%23g)' d='M16 2c7 0 13 5.5 13 12.5S23.5 30 16 30 3 25 3 17 9 2 16 2z'/%3E%3C/svg%3E">
+  <link rel="stylesheet" href="./styles.css">
+  <script type="importmap">
+  {
+    "imports": {
+      "three": "./vendor/three/build/three.module.js",
+      "three/addons/": "./vendor/three/examples/jsm/"
+    }
+  }
+  </script>
+</head>
+<body>
+  <div class="bg" aria-hidden="true">
+    <div class="orb orb-a"></div>
+    <div class="orb orb-b"></div>
+    <div class="orb orb-c"></div>
+    <div class="grain"></div>
+  </div>
+
+  <header class="topbar">
+    <a class="brand" href="./" id="brand" aria-label="Polysquish home">
+      <svg class="brand-glyph" viewBox="0 0 48 48" width="40" height="40" aria-hidden="true">
+        <defs>
+          <linearGradient id="pg-grad" x1="0" y1="0" x2="1" y2="1">
+            <stop offset="0" stop-color="#ff5fd2"/>
+            <stop offset="1" stop-color="#8b5cf6"/>
+          </linearGradient>
+          <radialGradient id="pg-shine" cx="0.3" cy="0.25" r="0.8">
+            <stop offset="0" stop-color="#ffffff" stop-opacity="0.55"/>
+            <stop offset="0.6" stop-color="#ffffff" stop-opacity="0"/>
+          </radialGradient>
+        </defs>
+        <path fill="url(#pg-grad)" d="M24 4c10.5 0 20 7.5 20 17.5 0 6.5-3.5 10.5-7 14-3.5 3.5-6.5 8.5-13 8.5S12.5 39.5 8 35 4 27.5 4 21.5C4 11.5 13.5 4 24 4z"/>
+        <path fill="url(#pg-shine)" d="M24 4c10.5 0 20 7.5 20 17.5 0 6.5-3.5 10.5-7 14-3.5 3.5-6.5 8.5-13 8.5S12.5 39.5 8 35 4 27.5 4 21.5C4 11.5 13.5 4 24 4z"/>
+        <circle cx="33" cy="15" r="3.2" fill="#fff" opacity="0.9"/>
+      </svg>
+      <span class="brand-text">
+        <span class="brand-name">Polysquish</span>
+        <span class="brand-tag">Squish millions of polygons into game-ready meshes.</span>
+      </span>
+    </a>
+    <div class="topbar-right">
+      <span class="chip chip-ghost" id="mock-badge" hidden>Mock mode</span>
+      <span class="chip chip-ghost" id="version-chip" title="Backend version">…</span>
+    </div>
+  </header>
+
+  <main id="app" class="app">
+    <!-- 1. Drop hero -->
+    <section class="view" id="view-drop" data-view="drop">
+      <div class="hero">
+        <p class="eyebrow">Step 1 · Pick a model</p>
+        <h1 class="hero-title">Turn a <span class="grad-text">million-polygon</span> blob into a mesh your engine will love.</h1>
+        <p class="hero-sub">Cleanup, decimation, UVs, baked textures, LODs and collision — in one squish.</p>
+
+        <div class="dropzone" id="dropzone" tabindex="0" role="button" aria-label="Drop your model here or press Enter to browse">
+          <div class="dropzone-inner">
+            <div class="drop-icon" aria-hidden="true">
+              <svg viewBox="0 0 64 64" width="64" height="64">
+                <defs>
+                  <linearGradient id="dz-grad" x1="0" y1="0" x2="1" y2="1">
+                    <stop offset="0" stop-color="#ff6ad5"/>
+                    <stop offset="1" stop-color="#9b7bff"/>
+                  </linearGradient>
+                </defs>
+                <path d="M32 6 56 19v26L32 58 8 45V19z" fill="none" stroke="url(#dz-grad)" stroke-width="2.5" stroke-linejoin="round"/>
+                <path d="M8 19l24 13 24-13M32 32v26" fill="none" stroke="url(#dz-grad)" stroke-width="2.5" stroke-linejoin="round" opacity="0.7"/>
+                <path d="M32 18v14m0-14-5 5m5-5 5 5" fill="none" stroke="#fff" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" class="drop-arrow"/>
+              </svg>
+            </div>
+            <h2 class="drop-title">Drop your model here</h2>
+            <p class="drop-formats">
+              <span class="fmt">.obj</span><span class="fmt">.ply</span><span class="fmt">.stl</span><span class="fmt">.glb</span><span class="fmt">.gltf</span>
+            </p>
+            <p class="drop-hint">Bring the <code>.mtl</code> and textures along if you have them.</p>
+            <div class="drop-actions">
+              <button class="btn btn-primary" id="browse-btn" type="button">Browse files</button>
+              <button class="btn btn-link" id="path-toggle" type="button" aria-expanded="false" aria-controls="path-row">or paste a file path</button>
+            </div>
+            <form class="path-row" id="path-row" hidden>
+              <label class="sr-only" for="path-input">Absolute file path</label>
+              <input class="input" id="path-input" type="text" placeholder="/absolute/path/to/model.obj" autocomplete="off" spellcheck="false">
+              <button class="btn btn-secondary" type="submit" id="path-submit">Load</button>
+            </form>
+            <input type="file" id="file-input" class="sr-only" multiple accept=".obj,.ply,.stl,.glb,.gltf,.mtl,.png,.jpg,.jpeg,.bin,.tga,.bmp,.webp,.ktx2" tabindex="-1">
+          </div>
+        </div>
+
+        <ul class="feature-row" aria-label="What Polysquish does">
+          <li><span class="feat-ico" aria-hidden="true">✦</span>Health check in plain language</li>
+          <li><span class="feat-ico" aria-hidden="true">✦</span>Smart decimation that keeps silhouettes</li>
+          <li><span class="feat-ico" aria-hidden="true">✦</span>Baked normal · albedo · AO maps</li>
+          <li><span class="feat-ico" aria-hidden="true">✦</span>LODs, collision and engine presets</li>
+        </ul>
+      </div>
+    </section>
+
+    <!-- 2. Health + presets -->
+    <section class="view" id="view-inspect" data-view="inspect" hidden>
+      <div class="view-head">
+        <div>
+          <p class="eyebrow">Step 2 · Check &amp; choose</p>
+          <h1 class="view-title" id="inspect-title">Health check</h1>
+        </div>
+        <button class="btn btn-ghost" id="inspect-back" type="button">← Choose another file</button>
+      </div>
+      <section class="card model-card" id="health-card" aria-busy="true" aria-labelledby="health-heading">
+        <div class="card-head">
+          <h2 class="card-title" id="health-heading">Your model</h2>
+          <span class="chip" id="health-file-chip">…</span>
+        </div>
+        <div class="model-grid">
+          <div class="viewer-wrap">
+            <div class="viewer" id="viewer-source" aria-label="Source preview"></div>
+            <div class="viewer-tools seg" role="group" aria-label="Viewer options">
+              <button class="seg-btn" type="button" id="src-wire" aria-pressed="false">Wireframe</button>
+            </div>
+          </div>
+          <div id="health-body"></div>
+        </div>
+      </section>
+      <div class="inspect-grid">
+        <div class="col col-health">
+          <section class="card" id="problems-card" aria-labelledby="problems-heading">
+            <div class="card-head">
+              <h2 class="card-title" id="problems-heading">What we noticed</h2>
+              <span class="chip chip-ghost" id="problems-chip">…</span>
+            </div>
+            <div id="problems-body"></div>
+          </section>
+        </div>
+        <div class="col col-recipe">
+          <section class="card" aria-labelledby="preset-heading">
+            <div class="card-head">
+              <h2 class="card-title" id="preset-heading">Pick a preset</h2>
+              <span class="chip" id="preset-active-chip">—</span>
+            </div>
+            <div class="preset-grid" id="preset-grid" role="radiogroup" aria-label="Presets"></div>
+          </section>
+          <section class="card adv-card">
+            <button class="adv-toggle" id="adv-toggle" type="button" aria-expanded="false" aria-controls="adv-panel">
+              <span class="adv-toggle-label">Advanced recipe</span>
+              <span class="adv-toggle-sub" id="adv-summary">Fine-tune triangles, textures, LODs, collision and export.</span>
+              <svg class="chev" viewBox="0 0 20 20" width="20" height="20" aria-hidden="true"><path d="M5 8l5 5 5-5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+            </button>
+            <div class="adv-panel" id="adv-panel" hidden></div>
+          </section>
+          <section class="card squish-card">
+            <label class="field">
+              <span class="field-label">Output name</span>
+              <input class="input" id="output-name" type="text" autocomplete="off" spellcheck="false">
+            </label>
+            <button class="btn btn-primary btn-huge" id="squish-btn" type="button">
+              <span class="btn-huge-ico" aria-hidden="true">
+                <svg viewBox="0 0 24 24" width="26" height="26"><path d="M12 3l2.4 5.2L20 9l-4 3.9.9 5.6L12 15.8 7.1 18.5 8 12.9 4 9l5.6-.8z" fill="currentColor"/></svg>
+              </span>
+              <span>Squish it</span>
+            </button>
+            <p class="squish-note" id="squish-note">Output goes to a new folder under your Polysquish output root.</p>
+          </section>
+        </div>
+      </div>
+    </section>
+
+    <!-- 3. Progress -->
+    <section class="view" id="view-progress" data-view="progress" hidden>
+      <div class="view-head">
+        <div>
+          <p class="eyebrow">Step 3 · Squishing</p>
+          <h1 class="view-title" id="progress-title">Squishing <span id="progress-name" class="grad-text"></span>…</h1>
+        </div>
+        <button class="btn btn-ghost btn-danger-ghost" id="cancel-btn" type="button">Cancel</button>
+      </div>
+      <section class="card progress-card">
+        <ol class="pipeline" id="pipeline" aria-label="Pipeline stages"></ol>
+        <div class="progress-status">
+          <div class="progress-label">
+            <span class="spinner" id="progress-spinner" aria-hidden="true"></span>
+            <span id="progress-stage-label" aria-live="polite">Starting…</span>
+          </div>
+          <div class="progress-meta">
+            <span id="progress-pct">0%</span>
+            <span class="dot-sep" aria-hidden="true">·</span>
+            <span id="progress-elapsed">0s</span>
+          </div>
+        </div>
+        <div class="bar" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0" id="progress-bar">
+          <div class="bar-fill" id="progress-fill"></div>
+        </div>
+      </section>
+      <section class="card log-card" aria-label="Job log">
+        <div class="card-head">
+          <h2 class="card-title">Log</h2>
+          <span class="chip chip-ghost" id="log-count">0 lines</span>
+        </div>
+        <pre class="log" id="log" tabindex="0"></pre>
+      </section>
+    </section>
+
+    <!-- 4. Results -->
+    <section class="view" id="view-results" data-view="results" hidden>
+      <div class="view-head">
+        <div>
+          <p class="eyebrow">Step 4 · Done</p>
+          <h1 class="view-title">Squished <span class="grad-text" id="results-name"></span></h1>
+        </div>
+        <div class="head-actions">
+          <a class="btn btn-primary" id="zip-btn" href="#" download>Download all (.zip)</a>
+          <button class="btn btn-ghost" id="again-btn" type="button">Squish another</button>
+        </div>
+      </div>
+      <div class="results-grid">
+        <div class="col">
+        <section class="card compare-card" aria-labelledby="compare-heading">
+          <div class="card-head">
+            <h2 class="card-title" id="compare-heading">Before → After</h2>
+            <span class="delta-badge" id="delta-badge">–0%</span>
+          </div>
+          <div id="compare-body"></div>
+        </section>
+        <section class="card" aria-labelledby="lods-heading">
+          <div class="card-head"><h2 class="card-title" id="lods-heading">LODs</h2></div>
+          <div id="lods-body"></div>
+        </section>
+        <section class="card" id="textures-card" aria-labelledby="tex-heading">
+          <div class="card-head"><h2 class="card-title" id="tex-heading">Baked textures</h2></div>
+          <div id="textures-body"></div>
+        </section>
+        </div>
+        <div class="col">
+        <section class="card viewer-card results-viewer-card" aria-label="Before and after preview">
+          <div class="card-head">
+            <div class="seg" role="group" aria-label="Which model to show">
+              <button class="seg-btn" type="button" id="res-before" aria-pressed="false">Before</button>
+              <button class="seg-btn" type="button" id="res-after" aria-pressed="true">After</button>
+            </div>
+            <div class="seg" role="group" aria-label="Viewer options">
+              <button class="seg-btn" type="button" id="res-wire" aria-pressed="false">Wireframe</button>
+            </div>
+          </div>
+          <div class="viewer" id="viewer-result"></div>
+        </section>
+        <section class="card" aria-labelledby="fixed-heading">
+          <div class="card-head"><h2 class="card-title" id="fixed-heading">Problems fixed</h2></div>
+          <div id="fixed-body"></div>
+        </section>
+        </div>
+        <section class="card files-card" aria-labelledby="files-heading">
+          <div class="card-head"><h2 class="card-title" id="files-heading">Output files</h2></div>
+          <div class="field copy-field">
+            <span class="field-label">Output folder</span>
+            <div class="copy-row">
+              <input class="input mono" id="output-dir" type="text" readonly>
+              <button class="btn btn-secondary" id="copy-dir" type="button">Copy</button>
+            </div>
+          </div>
+          <ul class="file-list" id="file-list"></ul>
+        </section>
+      </div>
+    </section>
+
+    <!-- Error -->
+    <section class="view" id="view-error" data-view="error" hidden>
+      <section class="card error-card" role="alert">
+        <div class="error-ico" aria-hidden="true">
+          <svg viewBox="0 0 48 48" width="56" height="56"><circle cx="24" cy="24" r="21" fill="none" stroke="currentColor" stroke-width="2.5"/><path d="M24 14v13" stroke="currentColor" stroke-width="3" stroke-linecap="round"/><circle cx="24" cy="33" r="2" fill="currentColor"/></svg>
+        </div>
+        <h1 class="view-title" id="error-title">Something went wrong</h1>
+        <p class="error-msg" id="error-msg"></p>
+        <div class="error-actions">
+          <button class="btn btn-primary" id="error-retry" type="button">Try again</button>
+          <button class="btn btn-ghost" id="error-reset" type="button">Start over</button>
+        </div>
+      </section>
+    </section>
+  </main>
+
+  <footer class="foot">
+    <span>Everything runs locally on your machine.</span>
+    <span class="dot-sep" aria-hidden="true">·</span>
+    <span id="foot-threads"></span>
+  </footer>
+
+  <div class="toasts" id="toasts" aria-live="assertive" aria-relevant="additions"></div>
+
+  <script type="module" src="./app.js"></script>
+</body>
+</html>

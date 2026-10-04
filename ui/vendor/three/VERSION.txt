@@ -1,0 +1,1 @@
+three.js r186 (npm three@0.186.1) — files: build/three.module.js, build/three.core.js, examples/jsm/controls/OrbitControls.js, examples/jsm/loaders/GLTFLoader.js, examples/jsm/utils/BufferGeometryUtils.js, examples/jsm/utils/SkeletonUtils.js, examples/jsm/environments/RoomEnvironment.js
