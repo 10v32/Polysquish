@@ -133,3 +133,46 @@ fn ply_roundtrip_keeps_colours() {
     assert!(back.mesh.has_colors());
     let _ = std::fs::remove_file(&p);
 }
+
+#[test]
+fn chunked_decimation_stitches_back_into_one_shell() {
+    let mut m = make_sphere(120); // ~57k triangles
+    polysquish::clean::weld(&mut m, 1e-6);
+    polysquish::clean::remove_degenerate(&mut m);
+    m.compute_smooth_normals();
+    let (b0, _) = polysquish::analyze::edge_stats(&m);
+    assert_eq!(b0, 0, "welded sphere should be closed");
+    let opts = polysquish::recipe::DecimateOptions { target_triangles: Some(3000), ..Default::default() };
+    let (out, rep, chunks) = polysquish::decimate::decimate_chunked(&m, &opts, 8000).unwrap();
+    assert!(chunks >= 2, "expected several chunks, got {chunks}");
+    let (_, count) = polysquish::analyze::components(&out);
+    let (boundary, non_manifold) = polysquish::analyze::edge_stats(&out);
+    assert_eq!(count, 1, "chunks were not stitched back together");
+    assert_eq!(boundary, 0, "stitch left open edges");
+    assert_eq!(non_manifold, 0);
+    assert!(out.triangle_count() <= 3600 && out.triangle_count() >= 2000, "{}", out.triangle_count());
+    assert!(rep.error < 0.05, "deviation {}", rep.error);
+}
+
+
+#[test]
+fn hidden_inner_shell_is_removed_but_outer_kept() {
+    let mut outer = make_sphere(48);
+    let mut inner = make_sphere(24);
+    for p in &mut inner.positions {
+        *p *= 0.5;
+    }
+    let inner_tris = inner.triangle_count();
+    outer.append(&inner, 0);
+    polysquish::clean::weld(&mut outer, 1e-6);
+    polysquish::clean::remove_degenerate(&mut outer);
+    let before = outer.triangle_count();
+    let bvh = polysquish::bvh::Bvh::build(&outer);
+    let removed = polysquish::clean::remove_hidden(&mut outer, &bvh, 32);
+    assert!(removed > 0, "inner shell should be detected");
+    assert!(removed <= inner_tris, "removed {removed} > inner {inner_tris}");
+    assert!(removed as f32 > inner_tris as f32 * 0.9, "removed only {removed} of {inner_tris}");
+    assert_eq!(outer.triangle_count(), before - removed);
+    let (_, comps) = polysquish::analyze::components(&outer);
+    assert_eq!(comps, 1);
+}

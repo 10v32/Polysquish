@@ -208,6 +208,19 @@ pub fn squish(scene: &Scene, recipe: &Recipe, out_dir: &Path, name: &str, progre
         progress.log(m.clone());
     }
     problems_fixed.extend(clean_rep.messages.iter().cloned());
+    progress.stage(Stage::Clean, 0.5);
+    let mut hidden_removed = 0usize;
+    // A single watertight shell cannot hide anything from itself; skip the (costly) visibility pass.
+    let single_closed = source_report.components == 1 && source_report.watertight && clean_rep.removed_floaters == 0;
+    if recipe.cleanup.remove_hidden && !single_closed {
+        let bvh = crate::bvh::Bvh::build(&high);
+        hidden_removed = crate::clean::remove_hidden(&mut high, &bvh, recipe.cleanup.hidden_samples);
+        if hidden_removed > 0 {
+            let msg = format!("Removed {} hidden interior faces", fmt_int(hidden_removed));
+            progress.log(msg.clone());
+            problems_fixed.push(msg);
+        }
+    }
     let high_scene = Scene {
         name: scene.name.clone(),
         mesh: high,
@@ -225,7 +238,13 @@ pub fn squish(scene: &Scene, recipe: &Recipe, out_dir: &Path, name: &str, progre
 
     // ---- decimate ----
     progress.stage(Stage::Decimate, 0.0);
-    let (mut lod0, dec_rep) = crate::decimate::decimate(&high_scene.mesh, &recipe.decimate)?;
+    let (mut lod0, dec_rep) = if high_scene.mesh.triangle_count() > recipe.decimate.chunk_threshold.max(100_000) {
+        let (m, r, chunks) = crate::decimate::decimate_chunked(&high_scene.mesh, &recipe.decimate, recipe.decimate.chunk_threshold.max(100_000) / 2)?;
+        progress.log(format!("Decimated in {chunks} parallel chunks"));
+        (m, r)
+    } else {
+        crate::decimate::decimate(&high_scene.mesh, &recipe.decimate)?
+    };
     progress.log(format!(
         "Squished {} → {} triangles (max deviation {:.3}% of size)",
         fmt_int(dec_rep.before_triangles),
@@ -280,7 +299,7 @@ pub fn squish(scene: &Scene, recipe: &Recipe, out_dir: &Path, name: &str, progre
     if recipe.bake.enabled && uv_ok && (recipe.bake.albedo || recipe.bake.normal_map || recipe.bake.ao || recipe.bake.metallic_roughness) {
         let auto = (dec_rep.error * 3.0).clamp(diag * 0.004, diag * 0.08);
         let ray_distance = recipe.bake.ray_distance.map(|f| f * diag).unwrap_or(auto);
-        match crate::bake::bake(&high_scene, &lod0, &recipe.bake, ray_distance, progress) {
+        match crate::bake::bake_cpu(&high_scene, &lod0, &recipe.bake, ray_distance, progress) {
             Ok(b) => {
                 progress.log(format!("Baked {}×{} textures ({:.0}% of the atlas covered)", b.width, b.height, b.coverage * 100.0));
                 baked = Some(b);

@@ -287,3 +287,133 @@ pub fn clean(mesh: &mut Mesh, opts: &CleanupOptions) -> CleanReport {
     mesh.compute_smooth_normals();
     rep
 }
+
+/// Remove faces that cannot be seen from outside the model: internal shells and parts buried
+/// inside other parts. Visibility is sampled with rays (early-out: most faces escape within the
+/// first few). Hidden faces are grouped into connected regions; a region is removed only when it
+/// is fully enclosed (no visible neighbour) or when it is a large, deeply hidden patch (an
+/// intersecting part). Small hidden patches in crevices are kept. Returns removed triangles.
+pub fn remove_hidden(mesh: &mut Mesh, tracer: &dyn crate::bvh::RayTracer, samples: u32) -> usize {
+    use crate::bvh::Ray;
+    use rayon::prelude::*;
+    let tc = mesh.triangle_count();
+    if tc < 64 {
+        return 0;
+    }
+    let samples = samples.clamp(8, 256) as usize;
+    let diag = mesh.bounds().diagonal.max(1e-9);
+    let far = diag * 4.0;
+    let eps = diag * 2e-5;
+    let face_n: Vec<Vec3> = (0..tc).map(|t| mesh.face_normal(t)).collect();
+    // Ray i for face t: cosine-weighted around +n for 3/4 of the samples, around -n otherwise,
+    // from one of three points on the face, with a per-face low-discrepancy rotation.
+    let ray_for = |t: usize, i: usize| -> Ray {
+        let [a, b, c] = mesh.tri(t);
+        let (pa, pb, pc) = (mesh.positions[a as usize], mesh.positions[b as usize], mesh.positions[c as usize]);
+        let n = if face_n[t] == Vec3::ZERO { Vec3::Y } else { face_n[t] };
+        let pts = [(pa + pb + pc) / 3.0, pa * 0.6 + pb * 0.2 + pc * 0.2, pa * 0.2 + pb * 0.2 + pc * 0.6];
+        let h = (t as u32).wrapping_mul(0x9e3779b9) ^ 0x85ebca6b;
+        let shift = ((h >> 8) as f32 / (1u32 << 24) as f32, ((h.wrapping_mul(0x27d4eb2d)) >> 8) as f32 / (1u32 << 24) as f32);
+        const G: f64 = 1.324_717_957_244_746;
+        let u1 = ((0.5 + (i as f64 + 1.0) / G).fract() as f32 + shift.0).fract();
+        let u2 = ((0.5 + (i as f64 + 1.0) / (G * G)).fract() as f32 + shift.1).fract();
+        let side = if i % 4 == 3 { -n } else { n };
+        let r = u1.sqrt();
+        let phi = std::f32::consts::TAU * u2;
+        let helper = if side.x.abs() < 0.9 { Vec3::X } else { Vec3::Y };
+        let tv = helper.cross(side).normalize_or_zero();
+        let bv = side.cross(tv);
+        let d = (tv * (r * phi.cos()) + bv * (r * phi.sin()) + side * (1.0 - u1).max(0.0).sqrt()).normalize_or_zero();
+        Ray { origin: pts[i % 3] + side * eps, dir: d, tmax: far }
+    };
+    // Pass 1: a few rays for every face; pass 2: the rest only for faces still fully blocked.
+    let first = samples.min(8);
+    let mut visible = vec![false; tc];
+    let mut pending: Vec<u32> = (0..tc as u32).collect();
+    for (pass, range) in [(0usize, 0..first), (1usize, first..samples)] {
+        if range.is_empty() || pending.is_empty() {
+            continue;
+        }
+        let per = range.len();
+        const CHUNK: usize = 65_536;
+        let mut still: Vec<u32> = Vec::new();
+        for chunk in pending.chunks(CHUNK) {
+            let rays: Vec<Ray> = chunk.par_iter().flat_map_iter(|&t| range.clone().map(move |i| ray_for(t as usize, i))).collect();
+            let blocked = tracer.any_hits(&rays);
+            for (k, &t) in chunk.iter().enumerate() {
+                if blocked[k * per..(k + 1) * per].iter().any(|&b| !b) {
+                    visible[t as usize] = true;
+                } else {
+                    still.push(t);
+                }
+            }
+        }
+        pending = still;
+        let _ = pass;
+    }
+    let hidden_total = pending.len();
+    if hidden_total == 0 {
+        return 0;
+    }
+    // Group hidden faces into edge-connected regions and look at their contact with visible faces.
+    let mut edge_faces: HashMap<(u32, u32), Vec<u32>> = HashMap::with_capacity(tc * 3);
+    for t in 0..tc {
+        let tri = mesh.tri(t);
+        for k in 0..3 {
+            let a = tri[k];
+            let b = tri[(k + 1) % 3];
+            let key = if a < b { (a, b) } else { (b, a) };
+            edge_faces.entry(key).or_default().push(t as u32);
+        }
+    }
+    let mut region = vec![u32::MAX; tc];
+    let mut regions: Vec<(usize, usize)> = Vec::new(); // (face count, faces touching a visible face)
+    let mut stack: Vec<u32> = Vec::new();
+    for &seed in &pending {
+        if region[seed as usize] != u32::MAX {
+            continue;
+        }
+        let rid = regions.len() as u32;
+        let mut count = 0usize;
+        let mut touching = 0usize;
+        region[seed as usize] = rid;
+        stack.push(seed);
+        while let Some(t) = stack.pop() {
+            count += 1;
+            let tri = mesh.tri(t as usize);
+            let mut touches = false;
+            for k in 0..3 {
+                let a = tri[k];
+                let b = tri[(k + 1) % 3];
+                let key = if a < b { (a, b) } else { (b, a) };
+                if let Some(fs) = edge_faces.get(&key) {
+                    for &f in fs {
+                        if visible[f as usize] {
+                            touches = true;
+                        } else if region[f as usize] == u32::MAX {
+                            region[f as usize] = rid;
+                            stack.push(f);
+                        }
+                    }
+                }
+            }
+            if touches {
+                touching += 1;
+            }
+        }
+        regions.push((count, touching));
+    }
+    let mut remove_region = vec![false; regions.len()];
+    for (i, &(count, touching)) in regions.iter().enumerate() {
+        let enclosed = touching == 0;
+        let large_and_deep = count >= (tc / 200).max(200) && (touching as f32) < 0.25 * count as f32;
+        remove_region[i] = enclosed || large_and_deep;
+    }
+    let keep: Vec<bool> = (0..tc).map(|t| region[t] == u32::MAX || !remove_region[region[t] as usize]).collect();
+    let removed = keep.iter().filter(|&&k| !k).count();
+    if removed == 0 || removed as f32 / tc as f32 > 0.9 {
+        return 0;
+    }
+    mesh.retain_triangles(&keep);
+    removed
+}

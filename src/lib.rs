@@ -14,6 +14,7 @@ pub mod pipeline;
 pub mod report;
 pub mod synth;
 pub mod progress;
+pub mod normals;
 pub mod server;
 
 pub use mesh::{Material, Mesh, Scene, Texture};

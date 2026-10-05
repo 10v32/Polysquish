@@ -67,6 +67,75 @@ pub fn existing_uvs_usable(mesh: &Mesh) -> bool {
     uv_area > 0.01 && overlap_ratio < 0.05
 }
 
+/// Positions relaxed toward their 1-ring average `iterations` times (boundary vertices fixed).
+fn smoothed_positions(mesh: &Mesh, iterations: usize) -> Vec<glam::Vec3> {
+    let n = mesh.vertex_count();
+    let mut adj: Vec<Vec<u32>> = vec![Vec::new(); n];
+    let mut edge_count: std::collections::HashMap<(u32, u32), u8> = std::collections::HashMap::new();
+    for t in 0..mesh.triangle_count() {
+        let [a, b, c] = mesh.tri(t);
+        for (x, y) in [(a, b), (b, c), (c, a)] {
+            adj[x as usize].push(y);
+            adj[y as usize].push(x);
+            let k = if x < y { (x, y) } else { (y, x) };
+            *edge_count.entry(k).or_insert(0) += 1;
+        }
+    }
+    let mut boundary = vec![false; n];
+    for ((a, b), c) in &edge_count {
+        if *c == 1 {
+            boundary[*a as usize] = true;
+            boundary[*b as usize] = true;
+        }
+    }
+    let mut cur = mesh.positions.clone();
+    for _ in 0..iterations {
+        let next: Vec<glam::Vec3> = (0..n)
+            .map(|i| {
+                if boundary[i] || adj[i].is_empty() {
+                    return cur[i];
+                }
+                let mut acc = glam::Vec3::ZERO;
+                for &j in &adj[i] {
+                    acc += cur[j as usize];
+                }
+                let avg = acc / adj[i].len() as f32;
+                cur[i] + (avg - cur[i]) * 0.5
+            })
+            .collect();
+        cur = next;
+    }
+    cur
+}
+
+/// Normals averaged over the 1-ring `iterations` times (positions untouched).
+fn smoothed_normals(mesh: &Mesh, iterations: usize) -> Vec<glam::Vec3> {
+    let n = mesh.vertex_count();
+    let mut adj: Vec<Vec<u32>> = vec![Vec::new(); n];
+    for t in 0..mesh.triangle_count() {
+        let [a, b, c] = mesh.tri(t);
+        for (x, y) in [(a, b), (b, c), (c, a)] {
+            adj[x as usize].push(y);
+            adj[y as usize].push(x);
+        }
+    }
+    let mut cur = mesh.normals.clone();
+    for _ in 0..iterations {
+        let next: Vec<glam::Vec3> = (0..n)
+            .map(|i| {
+                let mut acc = cur[i] * 2.0;
+                for &j in &adj[i] {
+                    acc += cur[j as usize];
+                }
+                let v = acc.normalize_or_zero();
+                if v == glam::Vec3::ZERO { cur[i] } else { v }
+            })
+            .collect();
+        cur = next;
+    }
+    cur
+}
+
 #[inline]
 fn point_in_tri(p: Vec2, a: Vec2, b: Vec2, c: Vec2) -> bool {
     let d1 = (p - b).perp_dot(a - b);
@@ -91,8 +160,14 @@ pub fn unwrap(mesh: &mut Mesh, opts: &UvOptions) -> Result<UvReport> {
     if !mesh.has_normals() {
         mesh.compute_smooth_normals();
     }
-    let positions: Vec<f32> = mesh.positions.iter().flat_map(|p| [p.x, p.y, p.z]).collect();
-    let normals: Vec<f32> = mesh.normals.iter().flat_map(|n| [n.x, n.y, n.z]).collect();
+    // Charting sees a lightly smoothed copy of the geometry (positions and normals): decimation
+    // noise otherwise fragments charts. The UVs are applied to the real mesh afterwards (same topology).
+    let smooth_pos = smoothed_positions(mesh, 3);
+    let positions: Vec<f32> = smooth_pos.iter().flat_map(|p| [p.x, p.y, p.z]).collect();
+    // Charting sees smoothed normals so decimation noise does not fragment charts; hard edges
+    // (already split into separate vertices upstream) still break charts naturally.
+    let smoothed = smoothed_normals(mesh, 4);
+    let normals: Vec<f32> = smoothed.iter().flat_map(|n| [n.x, n.y, n.z]).collect();
     let materials: Vec<u32> = if mesh.material_ids.is_empty() {
         Vec::new()
     } else {
@@ -116,7 +191,13 @@ pub fn unwrap(mesh: &mut Mesh, opts: &UvOptions) -> Result<UvReport> {
         .add_mesh(&decl)
         .map_err(|e| anyhow!("xatlas rejected the mesh: {e:?}"))?;
     let chart_opts = ChartOptions {
-        max_iterations: 2,
+        max_iterations: 3,
+        max_cost: 8.0,
+        normal_deviation_weight: 1.0,
+        roundness_weight: 0.005,
+        straightness_weight: 3.0,
+        normal_seam_weight: 6.0,
+        texture_seam_weight: 0.5,
         ..Default::default()
     };
     let pack_opts = PackOptions {

@@ -159,7 +159,7 @@ impl Default for BakeOptions {
             ray_distance: None,
             dilation_px: 8,
             supersample: 2,
-            hard_edge_angle: 60.0,
+            hard_edge_angle: 75.0,
             ao_denoise: true,
             gpu: true,
         }
