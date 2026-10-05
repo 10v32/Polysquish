@@ -15,6 +15,7 @@ pub mod report;
 pub mod synth;
 pub mod progress;
 pub mod normals;
+pub mod metrics;
 pub mod server;
 
 pub use mesh::{Material, Mesh, Scene, Texture};
