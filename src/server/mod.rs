@@ -560,6 +560,25 @@ async fn static_file(State(s): State<Shared>, uri: Uri) -> Response {
 
 /// Run the server until the process exits.
 pub async fn serve(port: u16, output_root: PathBuf, ui_dir: Option<PathBuf>, open_browser: bool) -> anyhow::Result<()> {
+    serve_with_ready(port, output_root, ui_dir, move |addr| {
+        let url = format!("http://{addr}");
+        eprintln!("Polysquish is running at {url}");
+        if open_browser {
+            let _ = open::that_detached(&url);
+        }
+    })
+    .await
+}
+
+/// Run the server until the process exits, calling `on_ready` with the bound address once the
+/// listener is accepting connections. Used by embedders (e.g. the desktop app) that bind to
+/// port 0 and need to know which port was picked.
+pub async fn serve_with_ready(
+    port: u16,
+    output_root: PathBuf,
+    ui_dir: Option<PathBuf>,
+    on_ready: impl FnOnce(std::net::SocketAddr) + Send + 'static,
+) -> anyhow::Result<()> {
     let work_dir = std::env::temp_dir().join(format!("polysquish-{}", std::process::id()));
     std::fs::create_dir_all(&work_dir)?;
     std::fs::create_dir_all(&output_root)?;
@@ -567,11 +586,7 @@ pub async fn serve(port: u16, output_root: PathBuf, ui_dir: Option<PathBuf>, ope
     let app = router(state);
     let listener = tokio::net::TcpListener::bind(("127.0.0.1", port)).await?;
     let addr = listener.local_addr()?;
-    let url = format!("http://{addr}");
-    eprintln!("Polysquish is running at {url}");
-    if open_browser {
-        let _ = open::that_detached(&url);
-    }
+    on_ready(addr);
     let result = axum::serve(listener, app).await;
     let _ = std::fs::remove_dir_all(&work_dir);
     result.map_err(Into::into)
