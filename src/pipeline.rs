@@ -90,6 +90,8 @@ pub struct CleanedState {
     pub hidden_removed: usize,
     pub bvh: Arc<Bvh>,
     pub reconstructed_points: bool,
+    /// Voxel mode: the rebuilt surface that decimation starts from (baking still uses `high`).
+    pub decimate_source: Option<Arc<Mesh>>,
 }
 
 /// Result of the decimate/retopo + UV stages.
@@ -359,7 +361,9 @@ pub fn squish_with(scene: &Scene, recipe: &Recipe, out_dir: &Path, name: &str, p
             }
             messages.extend(clean_rep.messages.iter().cloned());
             progress.stage(Stage::Clean, 0.4);
-            // Voxel rebuild: replace the surface by a watertight re-extraction.
+            // Voxel rebuild: a watertight re-extraction becomes the decimation source, while
+            // textures are still baked from the original surface (which carries the UVs/colours).
+            let mut decimate_source: Option<Arc<Mesh>> = None;
             if recipe.retopo.mode == RetopoMode::Voxel {
                 let res = recipe.retopo.voxel_resolution.clamp(32, 512);
                 progress.log(format!("Voxel rebuild at {res}³"));
@@ -369,7 +373,7 @@ pub fn squish_with(scene: &Scene, recipe: &Recipe, out_dir: &Path, name: &str, p
                         let msg = format!("Rebuilt as a watertight surface ({} faces)", fmt_int(v.polygons.len().max(v.triangle_count())));
                         progress.log(msg.clone());
                         messages.push(msg);
-                        high = v;
+                        decimate_source = Some(Arc::new(v));
                     }
                     Err(e) => progress.log(format!("Voxel rebuild failed ({e}); continuing with the cleaned mesh")),
                 }
@@ -390,7 +394,7 @@ pub fn squish_with(scene: &Scene, recipe: &Recipe, out_dir: &Path, name: &str, p
             let high_scene = Arc::new(Scene { mesh: high, ..scene_without_mesh(scene) });
             progress.stage(Stage::Clean, 1.0);
             timings.insert("clean".into(), timer.lap().into());
-            let st = Arc::new(CleanedState { high: high_scene, source_report, messages, hidden_removed, bvh, reconstructed_points: reconstructed });
+            let st = Arc::new(CleanedState { high: high_scene, source_report, messages, hidden_removed, bvh, reconstructed_points: reconstructed, decimate_source });
             if let Some(c) = &cache {
                 if !ctx.cache_key.is_empty() {
                     c.put(key_a.clone(), CacheItem::Cleaned(st.clone()));
@@ -423,7 +427,7 @@ pub fn squish_with(scene: &Scene, recipe: &Recipe, out_dir: &Path, name: &str, p
         _ => {
             let mut messages: Vec<String> = Vec::new();
             progress.stage(Stage::Decimate, 0.0);
-            let high = &high_scene.mesh;
+            let high: &Mesh = cleaned.decimate_source.as_deref().unwrap_or(&high_scene.mesh);
             let target = crate::decimate::resolve_target(high.triangle_count(), &recipe.decimate);
             let chunk_threshold = recipe.decimate.chunk_threshold.max(100_000);
             let decimate_to = |m: &Mesh, t: usize, progress: &Progress| -> Result<(Mesh, crate::decimate::DecimateReport)> {
@@ -590,7 +594,7 @@ pub fn squish_with(scene: &Scene, recipe: &Recipe, out_dir: &Path, name: &str, p
     let density = crate::metrics::texel_density(&lod0, recipe.bake.resolution);
     let mut previews: Vec<(String, Vec<u8>)> = Vec::new();
     {
-        let hm = crate::metrics::heatmap_vertices(&lod0, &dev_per_vertex, dev_stats.max_abs.max(1e-9));
+        let hm = crate::metrics::heatmap_vertices(&lod0, &dev_per_vertex, (dev_stats.heatmap_max * diag).max(1e-9));
         if let Ok(glb) = crate::io::gltf_out::encode_simple(&format!("{name}_deviation"), &hm, GlbMaterial { name: "heat".into(), base_color: [1.0; 4], double_sided: true, ..Default::default() }) {
             previews.push(("heatmap_deviation.glb".into(), glb));
         }

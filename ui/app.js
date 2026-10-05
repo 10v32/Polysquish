@@ -1635,7 +1635,8 @@ async function applyViewerState() {
       const d = m.deviation || {}; const pctUnit = d.unit === 'fraction_of_size' || !d.unit;
       $('#heat-title').textContent = 'Deviation';
       $('#heat-min').textContent = pctUnit ? '0%' : '0';
-      $('#heat-max').textContent = d.max != null ? (pctUnit ? fmtPct(d.max) : `${d.max} ${d.unit}`) : 'max';
+      const top = d.heatmap_max != null ? d.heatmap_max : d.max;
+      $('#heat-max').textContent = top != null ? (pctUnit ? fmtPct(top) + (d.max != null && top < d.max ? '+' : '') : `${top} ${d.unit}`) : 'max';
     } else {
       const t = m.texel_density || {};
       $('#heat-title').textContent = 'Texel density';

@@ -16,6 +16,9 @@ pub struct DeviationStats {
     pub unit: String,
     pub mean_abs: f32,
     pub max_abs: f32,
+    /// Top of the heat-map ramp (fraction of size): twice the 95th percentile, capped at `max`,
+    /// so the colouring shows variation instead of one outlier.
+    pub heatmap_max: f32,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, Default)]
@@ -74,6 +77,7 @@ pub fn deviation(low: &Mesh, bvh: &Bvh, diag: f32) -> (DeviationStats, Vec<f32>)
             unit: "fraction_of_size".into(),
             mean_abs: mean,
             max_abs: max,
+            heatmap_max: ((p95 * 2.0).min(max).max(1e-9)) / diag,
         },
         per_vertex,
     )
