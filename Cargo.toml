@@ -45,6 +45,11 @@ dirs = "6"
 uuid = { version = "1", features = ["v4"] }
 rand = { version = "0.9", default-features = false, features = ["std", "std_rng", "small_rng"] }
 bytemuck = { version = "1", features = ["derive"] }
+wgpu = { version = "30", default-features = false, features = ["std", "parking_lot", "wgsl", "vulkan", "gles", "dx12", "metal"] }
+pollster = "1"
+
+[dev-dependencies]
+naga = { version = "30", features = ["wgsl-in"] }
 
 [profile.release]
 opt-level = 3
