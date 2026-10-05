@@ -1,0 +1,29 @@
+{
+  "FileVersion": 3,
+  "Version": 1,
+  "VersionName": "0.1.0",
+  "FriendlyName": "Polysquish",
+  "Description": "Squish huge AI-generated meshes into game-ready Static Meshes with the polysquish executable: decimation, baked textures, LODs and UCX collision. Content-only plugin driven by Editor Python.",
+  "Category": "Editor",
+  "CreatedBy": "Polysquish contributors",
+  "CreatedByURL": "https://github.com/10v32/Polysquish",
+  "DocsURL": "https://github.com/10v32/Polysquish/tree/main/integrations/unreal",
+  "MarketplaceURL": "",
+  "SupportURL": "https://github.com/10v32/Polysquish/issues",
+  "EngineVersion": "5.1.0",
+  "CanContainContent": true,
+  "IsBetaVersion": true,
+  "IsExperimentalVersion": false,
+  "Installed": false,
+  "Modules": [],
+  "Plugins": [
+    {
+      "Name": "PythonScriptPlugin",
+      "Enabled": true
+    },
+    {
+      "Name": "EditorScriptingUtilities",
+      "Enabled": true
+    }
+  ]
+}

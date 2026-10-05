@@ -1,0 +1,17 @@
+schema_version = "1.0.0"
+
+id = "polysquish_blender"
+version = "0.1.0"
+name = "Polysquish"
+tagline = "Squish huge AI meshes into clean, baked, LOD'd game assets"
+maintainer = "Polysquish contributors"
+type = "add-on"
+website = "https://github.com/10v32/Polysquish"
+tags = ["Mesh", "Import-Export", "Bake"]
+blender_version_min = "4.2.0"
+license = ["SPDX:MIT"]
+
+# The add-on launches the external `polysquish` executable and reads/writes
+# temporary files, so it needs these permissions in the Extensions platform.
+[permissions]
+files = "Export the selection to a temporary GLB and import the squished result"
