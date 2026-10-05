@@ -131,7 +131,7 @@ pub fn decimate(mesh: &Mesh, opts: &DecimateOptions) -> Result<(Mesh, DecimateRe
     // If the simplifier stopped early because of locked borders, retry with borders free; only
     // then consider the sloppy clusterer, and only with a bounded error so it cannot shred the mesh.
     if out.triangle_count() > target * 12 / 10 && !opts.aggressive {
-        if opts.lock_border {
+        if opts.lock_border && !opts.keep_materials {
             let free = DecimateOptions { lock_border: false, ..opts.clone() };
             if let Ok((o2, e2)) = simplify_to(&out, target, &free, rel_err) {
                 if o2.triangle_count() < out.triangle_count() {

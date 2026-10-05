@@ -258,12 +258,17 @@ pub fn unwrap(mesh: &mut Mesh, opts: &UvOptions) -> Result<UvReport> {
     new.positions.reserve(nv);
     new.uvs.reserve(nv);
     let has_colors = mesh.has_colors();
+    let has_skin = mesh.has_skin();
     for v in &out_mesh.vertex_array {
         let src = v.xref as usize;
         new.positions.push(mesh.positions[src]);
         new.normals.push(mesh.normals[src]);
         if has_colors {
             new.colors.push(mesh.colors[src]);
+        }
+        if has_skin {
+            new.joints.push(mesh.joints[src]);
+            new.weights.push(mesh.weights[src]);
         }
         new.uvs.push(Vec2::new(v.uv[0] / w as f32, v.uv[1] / h as f32));
     }

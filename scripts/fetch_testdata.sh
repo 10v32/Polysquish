@@ -8,5 +8,8 @@ for f in stanford-bunny.obj armadillo.obj xyzrgb_dragon.obj happy.obj; do
 done
 [ -f DamagedHelmet.glb ] || curl -sS -L -o DamagedHelmet.glb \
   https://raw.githubusercontent.com/KhronosGroup/glTF-Sample-Assets/main/Models/DamagedHelmet/glTF-Binary/DamagedHelmet.glb
+for m in Fox RiggedSimple CesiumMan; do
+  [ -f "$m.glb" ] || curl -sS -L -o "$m.glb" "https://raw.githubusercontent.com/KhronosGroup/glTF-Sample-Assets/main/Models/$m/glTF-Binary/$m.glb"
+done
 echo "Test models ready. Make a 4M-triangle stress input with:"
 echo "  cargo run --release -- synth testdata/xyzrgb_dragon.obj -o testdata/dragon_4m.ply --levels 2"

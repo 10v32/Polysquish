@@ -20,6 +20,8 @@ pub mod voxel;
 pub mod progress;
 pub mod normals;
 pub mod metrics;
+pub mod skin;
+pub mod materials;
 pub mod server;
 pub mod bench;
 

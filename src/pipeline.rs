@@ -427,7 +427,18 @@ pub fn squish_with(scene: &Scene, recipe: &Recipe, out_dir: &Path, name: &str, p
         _ => {
             let mut messages: Vec<String> = Vec::new();
             progress.stage(Stage::Decimate, 0.0);
-            let high: &Mesh = cleaned.decimate_source.as_deref().unwrap_or(&high_scene.mesh);
+            let base_high: &Mesh = cleaned.decimate_source.as_deref().unwrap_or(&high_scene.mesh);
+            let multi = recipe.decimate.keep_materials && crate::materials::used_materials(base_high) > 1;
+            let split_high;
+            let high: &Mesh = if multi {
+                let mut m = base_high.clone();
+                let added = crate::materials::split_by_material(&mut m);
+                progress.log(format!("Keeping {} materials separate (split {} boundary vertices)", crate::materials::used_materials(&m), fmt_int(added)));
+                split_high = m;
+                &split_high
+            } else {
+                base_high
+            };
             let target = crate::decimate::resolve_target(high.triangle_count(), &recipe.decimate);
             let chunk_threshold = recipe.decimate.chunk_threshold.max(100_000);
             let decimate_to = |m: &Mesh, t: usize, progress: &Progress| -> Result<(Mesh, crate::decimate::DecimateReport)> {
@@ -475,6 +486,23 @@ pub fn squish_with(scene: &Scene, recipe: &Recipe, out_dir: &Path, name: &str, p
             if dec_rep.before_triangles > lod0.triangle_count() {
                 messages.push(format!("Reduced {} triangles to {}", fmt_int(dec_rep.before_triangles), fmt_int(lod0.triangle_count())));
             }
+            // Materials: recover per-triangle ids from the source, or collapse to one material.
+            if multi {
+                crate::materials::assign_by_proximity(&mut lod0, &high_scene.mesh, bvh.as_ref());
+            } else {
+                lod0.material_ids.clear();
+            }
+            // Rig: carry the source joint weights onto the new vertices.
+            if recipe.export.skin && high_scene.mesh.has_skin() && high_scene.skeleton.is_some() {
+                if crate::skin::transfer_skin(&high_scene.mesh, bvh.as_ref(), &mut lod0) {
+                    let msg = format!("Transferred skin weights ({} joints)", high_scene.skeleton.as_ref().map(|s| s.joints.len()).unwrap_or(0));
+                    progress.log(msg.clone());
+                    messages.push(msg);
+                }
+            } else {
+                lod0.joints.clear();
+                lod0.weights.clear();
+            }
             // Hard edges become split normals (and UV seams) before unwrapping.
             if recipe.bake.hard_edge_angle < 179.0 {
                 let added = crate::normals::split_hard_edges(&mut lod0, recipe.bake.hard_edge_angle);
@@ -491,7 +519,18 @@ pub fn squish_with(scene: &Scene, recipe: &Recipe, out_dir: &Path, name: &str, p
             progress.stage(Stage::Uv, 0.0);
             let mut uv_ok = false;
             let mut uv_charts = 0usize;
-            if recipe.uv.enabled {
+            if recipe.uv.enabled && multi {
+                match crate::materials::unwrap_udim(&mut lod0, &recipe.uv) {
+                    Ok(charts) => {
+                        uv_ok = true;
+                        uv_charts = charts;
+                        let tiles = crate::materials::used_materials(&lod0);
+                        progress.log(format!("Unwrapped into {charts} charts across {tiles} UDIM tiles"));
+                        messages.push(format!("Generated {tiles} UV tiles (UDIM) with {charts} charts"));
+                    }
+                    Err(e) => progress.log(format!("UV unwrap failed ({e}); continuing without textures")),
+                }
+            } else if recipe.uv.enabled {
                 match crate::uv::unwrap(&mut lod0, &recipe.uv) {
                     Ok(rep) => {
                         uv_ok = true;
@@ -526,7 +565,10 @@ pub fn squish_with(scene: &Scene, recipe: &Recipe, out_dir: &Path, name: &str, p
 
     // ---- bake ----
     progress.stage(Stage::Bake, 0.0);
-    let mut baked: Option<crate::bake::BakeOutput> = None;
+    // One bake per UDIM tile (one tile unless materials are kept separate).
+    let tiles: Vec<u32> = crate::materials::material_list(&lod0);
+    let multi = tiles.len() > 1;
+    let mut bakes: Vec<(usize, u32, crate::bake::BakeOutput)> = Vec::new();
     let mut tracer_name = String::from("cpu");
     if recipe.bake.enabled && uv_ok && (recipe.bake.albedo || recipe.bake.normal_map || recipe.bake.ao || recipe.bake.metallic_roughness) {
         let auto = (low.dec_error * 3.0).clamp(diag * 0.004, diag * 0.08);
@@ -534,16 +576,33 @@ pub fn squish_with(scene: &Scene, recipe: &Recipe, out_dir: &Path, name: &str, p
         let tracer = make_tracer(&high_scene.mesh, bvh.clone(), recipe.bake.gpu, progress);
         tracer_name = tracer.name().to_string();
         let sampler = crate::bake::HighSampler::new(&high_scene, recipe.bake.hard_edge_angle);
-        match crate::bake::bake(&high_scene, &lod0, &recipe.bake, ray_distance, tracer.as_ref(), &sampler, progress) {
-            Ok(b) => {
-                progress.log(format!("Baked {}×{} textures ({:.0}% of the atlas covered)", b.width, b.height, b.coverage * 100.0));
-                baked = Some(b);
-            }
-            Err(e) => {
-                if progress.cancel.is_cancelled() {
-                    return Err(e);
+        for (k, &mid) in tiles.iter().enumerate() {
+            let target_mesh;
+            let bake_mesh: &Mesh = if multi {
+                let (mut sub, _) = crate::materials::submesh(&lod0, mid);
+                for uv in &mut sub.uvs {
+                    uv.x -= k as f32;
                 }
-                progress.log(format!("Baking failed ({e}); exporting without textures"));
+                target_mesh = sub;
+                &target_mesh
+            } else {
+                &lod0
+            };
+            if multi {
+                progress.log(format!("Baking tile {} (material {})", crate::materials::udim_tile(k), high_scene.material(mid).name));
+            }
+            match crate::bake::bake(&high_scene, bake_mesh, &recipe.bake, ray_distance, tracer.as_ref(), &sampler, progress) {
+                Ok(b) => {
+                    progress.log(format!("Baked {}×{} textures ({:.0}% of the atlas covered)", b.width, b.height, b.coverage * 100.0));
+                    bakes.push((k, mid, b));
+                }
+                Err(e) => {
+                    if progress.cancel.is_cancelled() {
+                        return Err(e);
+                    }
+                    progress.log(format!("Baking failed ({e}); exporting without textures"));
+                    break;
+                }
             }
         }
     } else if recipe.bake.enabled && !uv_ok {
@@ -558,14 +617,21 @@ pub fn squish_with(scene: &Scene, recipe: &Recipe, out_dir: &Path, name: &str, p
     crate::decimate::optimize_for_gpu(&mut lod0);
     let ratios: Vec<f32> = recipe.lods.ratios.iter().copied().take(recipe.lods.count).collect();
     let lods = if ratios.is_empty() { Vec::new() } else { crate::decimate::lod_chain(&lod0, &ratios, &recipe.decimate) };
+    let mut lods = lods;
+    if multi {
+        for l in lods.iter_mut() {
+            crate::materials::assign_by_proximity(l, &high_scene.mesh, bvh.as_ref());
+        }
+    }
     if !lods.is_empty() {
         progress.log(format!("Built {} LODs: {}", lods.len(), lods.iter().map(|m| fmt_int(m.triangle_count())).collect::<Vec<_>>().join(", ")));
     }
     let dominant = crate::decimate::dominant_material(&high_scene.mesh);
     let src_mat = high_scene.material(dominant);
+    let baked: Option<&crate::bake::BakeOutput> = bakes.first().map(|b| &b.2);
     let mut imposter: Option<crate::imposter::ImposterOutput> = None;
     if recipe.lods.imposter {
-        let albedo_tex = baked.as_ref().and_then(|b| b.albedo.clone()).map(|img| Texture { name: "albedo".into(), image: img });
+        let albedo_tex = baked.and_then(|b| b.albedo.clone()).map(|img| Texture { name: "albedo".into(), image: img });
         let base = if albedo_tex.is_some() { [1.0; 4] } else { src_mat.base_color };
         match crate::imposter::generate(&lod0, albedo_tex.as_ref(), base, &crate::imposter::ImposterOptions { resolution: recipe.lods.imposter_resolution.clamp(256, 4096), frames: 4, hemisphere: true }) {
             Ok(i) => {
@@ -612,14 +678,20 @@ pub fn squish_with(scene: &Scene, recipe: &Recipe, out_dir: &Path, name: &str, p
     let mut files: Vec<FileEntry> = Vec::new();
     let open_fraction = source_report.boundary_edges as f32 / source_report.triangles.max(1) as f32;
     let double_sided = open_fraction > 0.05;
-    let mut tex_albedo = None;
-    let mut tex_normal = None;
-    let mut tex_ao = None;
-    let mut tex_orm = None;
-    if let Some(b) = &baked {
-        let mut save = |img: &Option<image::RgbaImage>, suffix: &str| -> Result<Option<String>> {
+    // Texture files per tile: `name_albedo.png`, or `name_albedo.1001.png` ... for UDIM tiles.
+    struct TileFiles {
+        material_id: u32,
+        albedo: Option<String>,
+        normal: Option<String>,
+        ao: Option<String>,
+        orm: Option<String>,
+    }
+    let mut tile_files: Vec<TileFiles> = Vec::new();
+    for (k, mid, b) in &bakes {
+        let suffix_of = |kind: &str| if multi { format!("{name}_{kind}.{}.png", crate::materials::udim_tile(*k)) } else { format!("{name}_{kind}.png") };
+        let mut save = |img: &Option<image::RgbaImage>, kind: &str| -> Result<Option<String>> {
             if let Some(img) = img {
-                let fname = format!("{name}_{suffix}.png");
+                let fname = suffix_of(kind);
                 img.save(out_dir.join(&fname))?;
                 files.push(file_entry(out_dir, &fname, "texture"));
                 Ok(Some(fname))
@@ -627,11 +699,16 @@ pub fn squish_with(scene: &Scene, recipe: &Recipe, out_dir: &Path, name: &str, p
                 Ok(None)
             }
         };
-        tex_albedo = save(&b.albedo, "albedo")?;
-        tex_normal = save(&b.normal, "normal")?;
-        tex_ao = save(&b.ao, "ao")?;
-        tex_orm = save(&b.orm, "orm")?;
+        let tf = TileFiles { material_id: *mid, albedo: save(&b.albedo, "albedo")?, normal: save(&b.normal, "normal")?, ao: save(&b.ao, "ao")?, orm: save(&b.orm, "orm")? };
+        tile_files.push(tf);
     }
+    let tex_albedo = tile_files.first().and_then(|t| t.albedo.clone());
+    let tex_normal = tile_files.first().and_then(|t| t.normal.clone());
+    let tex_ao = tile_files.first().and_then(|t| t.ao.clone());
+    let tex_orm = tile_files.first().and_then(|t| t.orm.clone());
+    // Exported meshes carry tile-local UVs (0..1 per primitive / material group).
+    let export_lod0 = if multi { crate::materials::with_tile_local_uvs(&lod0) } else { lod0.clone() };
+    let export_lods: Vec<Mesh> = if multi { lods.iter().map(crate::materials::with_tile_local_uvs).collect() } else { lods.clone() };
     if let Some(i) = &imposter {
         for (img, suffix) in [(&i.albedo, "imposter_albedo"), (&i.normal, "imposter_normal"), (&i.depth, "imposter_depth")] {
             let fname = format!("{name}_{suffix}.png");
@@ -656,8 +733,8 @@ pub fn squish_with(scene: &Scene, recipe: &Recipe, out_dir: &Path, name: &str, p
         }
         c
     };
-    let has_albedo = baked.as_ref().map(|b| b.albedo.is_some()).unwrap_or(false);
-    let has_orm = baked.as_ref().map(|b| b.orm.is_some()).unwrap_or(false);
+    let has_albedo = baked.map(|b| b.albedo.is_some()).unwrap_or(false);
+    let has_orm = baked.map(|b| b.orm.is_some()).unwrap_or(false);
     let main_glb_name = format!("{name}.glb");
     let mut main_glb = None;
     if recipe.export.glb {
@@ -666,13 +743,31 @@ pub fn squish_with(scene: &Scene, recipe: &Recipe, out_dir: &Path, name: &str, p
             base_color: if has_albedo { [1.0; 4] } else { src_mat.base_color },
             metallic: if has_orm { 1.0 } else { src_mat.metallic },
             roughness: if has_orm { 1.0 } else { src_mat.roughness },
-            albedo: baked.as_ref().and_then(|b| b.albedo.clone()),
-            normal: baked.as_ref().and_then(|b| b.normal.clone()),
-            orm: baked.as_ref().and_then(|b| b.orm.clone()),
+            albedo: baked.and_then(|b| b.albedo.clone()),
+            normal: baked.and_then(|b| b.normal.clone()),
+            orm: baked.and_then(|b| b.orm.clone()),
             double_sided,
         };
-        let mut lod_refs: Vec<&Mesh> = vec![&lod0];
-        lod_refs.extend(lods.iter());
+        let mut extra_materials: Vec<(u32, GlbMaterial)> = Vec::new();
+        for (i, ((_, mid, b), tf)) in bakes.iter().zip(tile_files.iter()).enumerate() {
+            if i == 0 {
+                continue;
+            }
+            let sm = high_scene.material(*mid);
+            let _ = tf;
+            extra_materials.push((*mid, GlbMaterial {
+                name: format!("{name}_{}", sm.name),
+                base_color: if b.albedo.is_some() { [1.0; 4] } else { sm.base_color },
+                metallic: if b.orm.is_some() { 1.0 } else { sm.metallic },
+                roughness: if b.orm.is_some() { 1.0 } else { sm.roughness },
+                albedo: b.albedo.clone(),
+                normal: b.normal.clone(),
+                orm: b.orm.clone(),
+                double_sided,
+            }));
+        }
+        let mut lod_refs: Vec<&Mesh> = vec![&export_lod0];
+        lod_refs.extend(export_lods.iter());
         let mut coll: Vec<(String, &Mesh)> = Vec::new();
         if recipe.export.target == Target::Unreal {
             for (i, (kind, m)) in collision.shapes().iter().enumerate() {
@@ -692,9 +787,12 @@ pub fn squish_with(scene: &Scene, recipe: &Recipe, out_dir: &Path, name: &str, p
         }
         let glb = crate::io::gltf_out::encode(&GlbScene {
             name: name.clone(),
+            skeleton: if recipe.export.skin { high_scene.skeleton.as_ref() } else { None },
+            animations: if recipe.export.skin { &high_scene.animations } else { &[] },
             lods: lod_refs,
             screen_coverage: coverage.clone(),
             material,
+            extra_materials,
             collision: coll,
             scale: glb_scale,
             generator_note: format!("Squished from {} triangles. Normal map: {}.", fmt_int(source_report.triangles), match recipe.bake.normal_convention { NormalConvention::OpenGL => "OpenGL (+Y)", NormalConvention::DirectX => "DirectX (-Y)" }),
@@ -708,9 +806,12 @@ pub fn squish_with(scene: &Scene, recipe: &Recipe, out_dir: &Path, name: &str, p
             let first = coll[0].1;
             let glb = crate::io::gltf_out::encode(&GlbScene {
                 name: format!("{name}_collision"),
+                skeleton: None,
+                animations: &[],
                 lods: vec![first],
                 screen_coverage: vec![],
                 material: GlbMaterial { name: "collision".into(), base_color: [0.4, 1.0, 0.7, 0.5], ..Default::default() },
+                extra_materials: vec![],
                 collision: coll[1..].to_vec(),
                 scale: glb_scale,
                 generator_note: "Collision shapes".into(),
@@ -727,27 +828,36 @@ pub fn squish_with(scene: &Scene, recipe: &Recipe, out_dir: &Path, name: &str, p
     if recipe.export.obj {
         let mtl_name = format!("{name}.mtl");
         let mat_name = format!("{name}_material");
-        crate::io::obj_out::write_mtl(
-            &out_dir.join(&mtl_name),
-            &mat_name,
-            &crate::io::obj_out::ObjMaterialFiles {
-                albedo: tex_albedo.clone(),
-                normal: tex_normal.clone(),
-                ao: tex_ao.clone(),
-                orm: tex_orm.clone(),
-                base_color: if tex_albedo.is_some() { [1.0; 4] } else { src_mat.base_color },
-                roughness: src_mat.roughness,
-                metallic: src_mat.metallic,
-            },
-        )?;
+        let mut obj_mats: Vec<(String, crate::io::obj_out::ObjMaterialFiles)> = Vec::new();
+        let mut names: std::collections::HashMap<u32, String> = std::collections::HashMap::new();
+        if multi {
+            for (k, tf) in tile_files.iter().enumerate() {
+                let sm = high_scene.material(tf.material_id);
+                let mname = format!("{name}_{}_{}", sanitize(&sm.name), crate::materials::udim_tile(k));
+                names.insert(tf.material_id, mname.clone());
+                obj_mats.push((mname, crate::io::obj_out::ObjMaterialFiles {
+                    albedo: tf.albedo.clone(), normal: tf.normal.clone(), ao: tf.ao.clone(), orm: tf.orm.clone(),
+                    base_color: if tf.albedo.is_some() { [1.0; 4] } else { sm.base_color }, roughness: sm.roughness, metallic: sm.metallic,
+                }));
+            }
+        }
+        if obj_mats.is_empty() {
+            obj_mats.push((mat_name.clone(), crate::io::obj_out::ObjMaterialFiles {
+                albedo: tex_albedo.clone(), normal: tex_normal.clone(), ao: tex_ao.clone(), orm: tex_orm.clone(),
+                base_color: if tex_albedo.is_some() { [1.0; 4] } else { src_mat.base_color }, roughness: src_mat.roughness, metallic: src_mat.metallic,
+            }));
+        }
+        let refs: Vec<(String, &crate::io::obj_out::ObjMaterialFiles)> = obj_mats.iter().map(|(n, f)| (n.clone(), f)).collect();
+        crate::io::obj_out::write_mtl_multi(&out_dir.join(&mtl_name), &refs)?;
         files.push(file_entry(out_dir, &mtl_name, "mtl"));
+        let default_mat = obj_mats[0].0.clone();
         let obj_name = format!("{name}.obj");
-        crate::io::obj_out::write_obj(&out_dir.join(&obj_name), &lod0, &name, Some(&mtl_name), &mat_name, dcc_scale)?;
+        crate::io::obj_out::write_obj_multi(&out_dir.join(&obj_name), &export_lod0, &name, Some(&mtl_name), &default_mat, &names, dcc_scale)?;
         files.push(file_entry(out_dir, &obj_name, "obj"));
         main_obj = Some(obj_name);
-        for (i, l) in lods.iter().enumerate() {
+        for (i, l) in export_lods.iter().enumerate() {
             let fname = format!("{name}_LOD{}.obj", i + 1);
-            crate::io::obj_out::write_obj(&out_dir.join(&fname), l, &format!("{name}_LOD{}", i + 1), Some(&mtl_name), &mat_name, dcc_scale)?;
+            crate::io::obj_out::write_obj_multi(&out_dir.join(&fname), l, &format!("{name}_LOD{}", i + 1), Some(&mtl_name), &default_mat, &names, dcc_scale)?;
             files.push(file_entry(out_dir, &fname, "lod"));
         }
         if let Some(i) = &imposter {
@@ -766,8 +876,8 @@ pub fn squish_with(scene: &Scene, recipe: &Recipe, out_dir: &Path, name: &str, p
 
     let mut main_fbx = None;
     if recipe.export.fbx {
-        let mut fbx_lods: Vec<crate::io::fbx_out::FbxLod> = vec![crate::io::fbx_out::FbxLod { name: format!("{name}_LOD0"), mesh: &lod0 }];
-        for (i, l) in lods.iter().enumerate() {
+        let mut fbx_lods: Vec<crate::io::fbx_out::FbxLod> = vec![crate::io::fbx_out::FbxLod { name: format!("{name}_LOD0"), mesh: &export_lod0 }];
+        for (i, l) in export_lods.iter().enumerate() {
             fbx_lods.push(crate::io::fbx_out::FbxLod { name: format!("{name}_LOD{}", i + 1), mesh: l });
         }
         if fbx_lods.len() == 1 {
@@ -848,7 +958,7 @@ pub fn squish_with(scene: &Scene, recipe: &Recipe, out_dir: &Path, name: &str, p
         after: AfterStats {
             triangles: lod0.triangle_count(),
             vertices: lod0.vertex_count(),
-            texture_size: baked.as_ref().map(|b| b.width).unwrap_or(0),
+            texture_size: baked.map(|b| b.width).unwrap_or(0),
             size_bytes: after_size,
             lods: lod_stats,
         },

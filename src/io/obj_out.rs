@@ -17,6 +17,11 @@ pub struct ObjMaterialFiles {
 }
 
 pub fn write_obj(path: &Path, mesh: &Mesh, object_name: &str, mtl_file: Option<&str>, material_name: &str, scale: f32) -> Result<()> {
+    write_obj_multi(path, mesh, object_name, mtl_file, material_name, &std::collections::HashMap::new(), scale)
+}
+
+/// Like `write_obj`; triangles whose material id is in `names` get their own `usemtl` group.
+pub fn write_obj_multi(path: &Path, mesh: &Mesh, object_name: &str, mtl_file: Option<&str>, material_name: &str, names: &std::collections::HashMap<u32, String>, scale: f32) -> Result<()> {
     let mut s = String::with_capacity(mesh.vertex_count() * 64);
     writeln!(s, "# Exported by Polysquish {}", crate::VERSION)?;
     if let Some(m) = mtl_file {
@@ -32,10 +37,22 @@ pub fn write_obj(path: &Path, mesh: &Mesh, object_name: &str, mtl_file: Option<&
     for n in &mesh.normals {
         writeln!(s, "vn {} {} {}", n.x, n.y, n.z)?;
     }
-    writeln!(s, "usemtl {material_name}")?;
     writeln!(s, "s 1")?;
     let (has_uv, has_n) = (mesh.has_uvs(), mesh.has_normals());
-    for t in 0..mesh.triangle_count() {
+    let order: Vec<usize> = if names.is_empty() || mesh.material_ids.is_empty() {
+        (0..mesh.triangle_count()).collect()
+    } else {
+        let mut v: Vec<usize> = (0..mesh.triangle_count()).collect();
+        v.sort_by_key(|&t| mesh.material_ids[t]);
+        v
+    };
+    let mut current: Option<String> = None;
+    for t in order {
+        let want = if names.is_empty() || mesh.material_ids.is_empty() { material_name.to_string() } else { names.get(&mesh.material_ids[t]).cloned().unwrap_or_else(|| material_name.to_string()) };
+        if current.as_deref() != Some(want.as_str()) {
+            writeln!(s, "usemtl {want}")?;
+            current = Some(want);
+        }
         let [a, b, c] = mesh.tri(t);
         let f = |i: u32| -> String {
             let i = i + 1;
@@ -54,8 +71,13 @@ pub fn write_obj(path: &Path, mesh: &Mesh, object_name: &str, mtl_file: Option<&
 }
 
 pub fn write_mtl(path: &Path, material_name: &str, files: &ObjMaterialFiles) -> Result<()> {
+    write_mtl_multi(path, &[(material_name.to_string(), files)])
+}
+
+pub fn write_mtl_multi(path: &Path, materials: &[(String, &ObjMaterialFiles)]) -> Result<()> {
     let mut s = String::new();
     writeln!(s, "# Exported by Polysquish {}", crate::VERSION)?;
+    for (material_name, files) in materials {
     writeln!(s, "newmtl {material_name}")?;
     let c = files.base_color;
     writeln!(s, "Kd {} {} {}", c[0], c[1], c[2])?;
@@ -80,6 +102,8 @@ pub fn write_mtl(path: &Path, material_name: &str, files: &ObjMaterialFiles) -> 
     if let Some(orm) = &files.orm {
         writeln!(s, "map_Pr -imfchan g {orm}")?;
         writeln!(s, "map_Pm -imfchan b {orm}")?;
+    }
+    writeln!(s)?;
     }
     std::fs::write(path, s)?;
     Ok(())

@@ -196,3 +196,109 @@ fn hard_edge_split_keeps_geometry_consistent() {
         assert!(m.normals[a as usize].dot(fnrm) > 0.999);
     }
 }
+
+#[test]
+fn rigged_fox_keeps_skin_and_animations() {
+    let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("testdata/Fox.glb");
+    if !path.exists() {
+        eprintln!("skipping: testdata/Fox.glb missing (run scripts/fetch_testdata.sh)");
+        return;
+    }
+    let scene = polysquish::io::load_scene(&path).unwrap();
+    assert!(scene.mesh.has_skin());
+    assert_eq!(scene.skeleton.as_ref().map(|s| s.joints.len()), Some(24));
+    assert_eq!(scene.animations.len(), 3);
+    let mut recipe = Recipe::preset("character").unwrap();
+    recipe.decimate.target_triangles = Some(1200);
+    recipe.bake.resolution = 256;
+    recipe.uv.resolution = 256;
+    recipe.bake.ao = false;
+    recipe.bake.supersample = 1;
+    recipe.lods.count = 1;
+    let dir = std::env::temp_dir().join(format!("polysquish-rig-{}", std::process::id()));
+    let result = polysquish::pipeline::squish(&scene, &recipe, &dir, "fox", &polysquish::progress::Progress::silent()).unwrap();
+    let rig = result.rig.expect("rig info");
+    assert_eq!(rig.joints, 24);
+    assert_eq!(rig.animations, vec!["Survey", "Walk", "Run"]);
+    let back = polysquish::io::load_scene(&dir.join("fox.glb")).unwrap();
+    assert!(back.mesh.has_skin(), "exported GLB lost its skin");
+    assert_eq!(back.skeleton.map(|s| s.joints.len()), Some(24));
+    assert_eq!(back.animations.len(), 3);
+    for w in &back.mesh.weights {
+        let sum: f32 = w.iter().sum();
+        assert!((sum - 1.0).abs() < 1e-3, "weights must be normalised, got {sum}");
+    }
+    assert!(result.files.iter().any(|f| f.name == "fox.fbx"));
+    let _ = std::fs::remove_dir_all(&dir);
+}
+
+#[test]
+fn multi_material_exports_udim_tiles_and_primitives() {
+    use polysquish::mesh::Material;
+    let mut mesh = make_sphere(64);
+    polysquish::clean::weld(&mut mesh, 1e-6);
+    polysquish::clean::remove_degenerate(&mut mesh);
+    mesh.colors.clear();
+    mesh.compute_smooth_normals();
+    // Upper hemisphere = material 0 (red), lower = material 1 (blue).
+    mesh.material_ids = (0..mesh.triangle_count())
+        .map(|t| {
+            let [a, b, c] = mesh.tri(t);
+            let y = mesh.positions[a as usize].y + mesh.positions[b as usize].y + mesh.positions[c as usize].y;
+            if y >= 0.0 { 0 } else { 1 }
+        })
+        .collect();
+    let scene = Scene {
+        name: "twotone".into(),
+        mesh,
+        materials: vec![
+            Material { name: "red".into(), base_color: [1.0, 0.1, 0.1, 1.0], ..Default::default() },
+            Material { name: "blue".into(), base_color: [0.1, 0.2, 1.0, 1.0], ..Default::default() },
+        ],
+        textures: vec![],
+        source_format: "test".into(),
+        source_bytes: 0,
+        skeleton: None,
+        animations: vec![],
+    };
+    let mut recipe = Recipe::preset("prop").unwrap();
+    recipe.decimate.target_triangles = Some(2000);
+    recipe.decimate.keep_materials = true;
+    recipe.bake.resolution = 128;
+    recipe.uv.resolution = 128;
+    recipe.bake.ao = false;
+    recipe.bake.supersample = 1;
+    recipe.lods.count = 1;
+    recipe.collision.convex_hull = false;
+    let dir = std::env::temp_dir().join(format!("polysquish-udim-{}", std::process::id()));
+    let progress = polysquish::progress::Progress::silent();
+    let result = polysquish::pipeline::squish(&scene, &recipe, &dir, "twotone", &progress).expect("pipeline");
+    let names: Vec<&str> = result.files.iter().map(|f| f.name.as_str()).collect();
+    assert!(names.contains(&"twotone_albedo.1001.png"), "{names:?}");
+    assert!(names.contains(&"twotone_albedo.1002.png"), "{names:?}");
+    let mean = |f: &str| -> [f64; 3] {
+        let img = image::open(dir.join(f)).unwrap().to_rgba8();
+        let mut s = [0f64; 3];
+        let mut n = 0.0;
+        for p in img.pixels() {
+            for k in 0..3 { s[k] += p.0[k] as f64; }
+            n += 1.0;
+        }
+        [s[0] / n, s[1] / n, s[2] / n]
+    };
+    let t1 = mean("twotone_albedo.1001.png");
+    let t2 = mean("twotone_albedo.1002.png");
+    assert!(t1[0] > t1[2] + 40.0, "tile 1001 should be red-ish: {t1:?}");
+    assert!(t2[2] > t2[0] + 40.0, "tile 1002 should be blue-ish: {t2:?}");
+    // GLB: two materials, LOD0 mesh split into two primitives.
+    let (doc, _, _) = gltf::import(dir.join("twotone.glb")).unwrap();
+    assert_eq!(doc.materials().count(), 2);
+    let lod0 = doc.meshes().next().unwrap();
+    assert_eq!(lod0.primitives().count(), 2);
+    // OBJ: two usemtl groups referencing the tile textures.
+    let obj = std::fs::read_to_string(dir.join("twotone.obj")).unwrap();
+    assert_eq!(obj.matches("usemtl ").count(), 2, "expected two material groups");
+    let mtl = std::fs::read_to_string(dir.join("twotone.mtl")).unwrap();
+    assert!(mtl.contains("twotone_albedo.1001.png") && mtl.contains("twotone_albedo.1002.png"));
+    let _ = std::fs::remove_dir_all(&dir);
+}
