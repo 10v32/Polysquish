@@ -1,0 +1,80 @@
+[
+  {
+    "id": "bunny",
+    "source": {
+      "url": "https://raw.githubusercontent.com/alecjacobson/common-3d-test-models/master/data/stanford-bunny.obj",
+      "sha256": "1eb35d1e21ce99e5ce911353b6be278990713448dd9e8f5c9387f9de39b32205"
+    },
+    "tags": ["scan", "small", "fast"],
+    "presets": ["hero", "prop", "mobile"],
+    "notes": "Stanford bunny, 69,451 triangles, open bottom (boundary edges). Classic range-scan merge."
+  },
+  {
+    "id": "armadillo",
+    "source": {
+      "url": "https://raw.githubusercontent.com/alecjacobson/common-3d-test-models/master/data/armadillo.obj",
+      "sha256": "d2fd040334c12b16804fbcb9962391232cc24708244617f931baaa871210563e"
+    },
+    "tags": ["scan", "small", "fast"],
+    "presets": ["hero", "prop", "mobile"],
+    "notes": "Stanford armadillo (reduced), 99,976 triangles, watertight."
+  },
+  {
+    "id": "xyzrgb_dragon",
+    "source": {
+      "url": "https://raw.githubusercontent.com/alecjacobson/common-3d-test-models/master/data/xyzrgb_dragon.obj",
+      "sha256": "5d7106b58f2ac0d017758480fe607c5b6bf7d6201d930d2dd1ba7022c4d281c0"
+    },
+    "tags": ["scan"],
+    "presets": ["hero", "prop"],
+    "notes": "XYZ RGB dragon (reduced), 249,882 triangles, thin spikes and deep concavities."
+  },
+  {
+    "id": "happy",
+    "source": {
+      "url": "https://raw.githubusercontent.com/alecjacobson/common-3d-test-models/master/data/happy.obj",
+      "sha256": "8ce5a4a7161efd97dabc8eeb281824fac1b17c9ba2cb0c2c6f350cd05982058c"
+    },
+    "tags": ["scan"],
+    "presets": ["hero", "prop"],
+    "notes": "Stanford happy Buddha (reduced), 98,601 triangles, many small holes."
+  },
+  {
+    "id": "damaged_helmet",
+    "source": {
+      "url": "https://raw.githubusercontent.com/KhronosGroup/glTF-Sample-Assets/main/Models/DamagedHelmet/glTF-Binary/DamagedHelmet.glb",
+      "sha256": "a1e3b04de97b11de564ce6e53b95f02954a297f0008183ac63a4f5974f6b32d8"
+    },
+    "tags": ["textured", "pbr", "glb", "fast"],
+    "presets": ["hero", "prop", "mobile"],
+    "notes": "Khronos DamagedHelmet (CC-BY 4.0, theblueturtle_), 15,452 triangles with UVs and a full PBR texture set. Exercises existing-UV detection and texture transfer."
+  },
+  {
+    "id": "bunny_1m",
+    "source": { "synth": { "from": "bunny", "levels": 2, "noise": 0.003, "floaters": 25 } },
+    "tags": ["synth", "ai", "stress", "fast"],
+    "presets": ["hero", "prop", "mobile"],
+    "notes": "Bunny subdivided twice (1,111,216 triangles), displaced with multi-octave noise, painted with vertex colours, plus floaters, duplicate vertices, degenerate and flipped faces. The smallest multi-million-vertex input; used for the committed baseline."
+  },
+  {
+    "id": "armadillo_1m6",
+    "source": { "synth": { "from": "armadillo", "levels": 2, "noise": 0.003, "floaters": 25 } },
+    "tags": ["synth", "ai", "stress"],
+    "presets": ["hero", "prop"],
+    "notes": "Armadillo subdivided twice (~1.6M triangles) with AI-style defects. Closed surface, so hidden-face removal has nothing to do."
+  },
+  {
+    "id": "dragon_4m",
+    "source": { "synth": { "from": "xyzrgb_dragon", "levels": 2, "noise": 0.003, "floaters": 40 } },
+    "tags": ["synth", "ai", "stress"],
+    "presets": ["hero", "prop"],
+    "notes": "XYZ RGB dragon subdivided twice (~4.0M triangles). Crosses the chunked-decimation threshold."
+  },
+  {
+    "id": "happy_6m",
+    "source": { "synth": { "from": "happy", "levels": 3, "noise": 0.002, "floaters": 60 } },
+    "tags": ["synth", "ai", "stress", "slow"],
+    "presets": ["hero"],
+    "notes": "Happy Buddha subdivided three times (~6.3M triangles). The heaviest entry; intended for the weekly run, not for quick local checks."
+  }
+]

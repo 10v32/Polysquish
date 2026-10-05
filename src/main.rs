@@ -83,6 +83,33 @@ enum Command {
         #[arg(long)]
         no_paint: bool,
     },
+    /// Run the regression corpus and compare against a baseline (dev tool)
+    Bench {
+        /// Corpus manifest
+        #[arg(long, default_value = "corpus/manifest.json")]
+        manifest: PathBuf,
+        /// Baseline bench.json to compare against (and to update with --update-baseline)
+        #[arg(long, default_value = "corpus/baseline.json")]
+        baseline: PathBuf,
+        /// Output root (bench.json, bench.md and one folder per run)
+        #[arg(long, default_value = "bench_out")]
+        out: PathBuf,
+        /// Only entries whose id contains, or whose tags equal, one of these comma-separated tokens
+        #[arg(long)]
+        filter: Option<String>,
+        /// Run only these presets (repeatable) instead of the ones each entry lists
+        #[arg(long = "preset")]
+        presets: Vec<String>,
+        /// Write the results into the baseline file (merged by id and preset)
+        #[arg(long)]
+        update_baseline: bool,
+        /// Relative growth of time or deviation that counts as a regression
+        #[arg(long, default_value_t = 0.15)]
+        tolerance: f32,
+        /// Smaller textures (<= 512 px), no ambient occlusion
+        #[arg(long)]
+        quick: bool,
+    },
 }
 
 fn main() -> Result<()> {
@@ -185,6 +212,23 @@ fn main() -> Result<()> {
                 other => anyhow::bail!("synth output must be .ply or .obj (got .{other})"),
             }
             eprintln!("Wrote {} triangles to {}", mesh.triangle_count(), output.display());
+            Ok(())
+        }
+        Command::Bench { manifest, baseline, out, filter, presets, update_baseline, tolerance, quick } => {
+            let args = polysquish::bench::BenchArgs {
+                manifest,
+                baseline: Some(baseline),
+                out,
+                filter,
+                presets: if presets.is_empty() { None } else { Some(presets) },
+                update_baseline,
+                tolerance,
+                quick,
+            };
+            let ok = polysquish::bench::run(&args)?;
+            if !ok {
+                std::process::exit(1);
+            }
             Ok(())
         }
     }

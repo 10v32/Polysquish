@@ -21,6 +21,7 @@ pub mod progress;
 pub mod normals;
 pub mod metrics;
 pub mod server;
+pub mod bench;
 
 pub use mesh::{Material, Mesh, Scene, Texture};
 pub use recipe::Recipe;

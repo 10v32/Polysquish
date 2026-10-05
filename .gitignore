@@ -5,3 +5,5 @@
 *.log
 /out
 /.claude/
+/corpus/cache
+/bench_out

@@ -1,0 +1,1389 @@
+{
+  "polysquish_version": "0.1.0",
+  "git_commit": "22548f6",
+  "timestamp": "2026-10-05T02:42:26Z",
+  "host": {
+    "os": "linux",
+    "arch": "x86_64",
+    "cpus": 4,
+    "rayon_threads": 4
+  },
+  "quick": true,
+  "tolerance": 0.15,
+  "results": [
+    {
+      "id": "armadillo",
+      "preset": "hero",
+      "tags": [
+        "scan",
+        "small",
+        "fast"
+      ],
+      "status": "ok",
+      "input": {
+        "path": "corpus/cache/armadillo.obj",
+        "triangles": 99976,
+        "vertices": 49990,
+        "bytes": 4634780
+      },
+      "load_s": 0.064,
+      "pipeline_s": 10.388,
+      "total_s": 10.452,
+      "timings": {
+        "analyze": 0.02,
+        "bake": 0.37,
+        "clean": 0.08,
+        "collision": 0.02,
+        "decimate": 0.06,
+        "export": 0.09,
+        "lods": 0.04,
+        "uv": 9.7
+      },
+      "output": {
+        "triangles": 30000,
+        "vertices": 19072,
+        "texture_size": 512,
+        "lods": [
+          15000,
+          7500,
+          3000
+        ],
+        "lod_count": 3,
+        "files": [
+          {
+            "name": "armadillo_albedo.png",
+            "bytes": 7469
+          },
+          {
+            "name": "armadillo_normal.png",
+            "bytes": 411625
+          },
+          {
+            "name": "armadillo_orm.png",
+            "bytes": 6263
+          },
+          {
+            "name": "armadillo.glb",
+            "bytes": 2336684
+          },
+          {
+            "name": "armadillo_collision.glb",
+            "bytes": 27908
+          },
+          {
+            "name": "armadillo.mtl",
+            "bytes": 297
+          },
+          {
+            "name": "armadillo.obj",
+            "bytes": 3280988
+          },
+          {
+            "name": "armadillo_LOD1.obj",
+            "bytes": 1692446
+          },
+          {
+            "name": "armadillo_LOD2.obj",
+            "bytes": 902465
+          },
+          {
+            "name": "armadillo_LOD3.obj",
+            "bytes": 395333
+          },
+          {
+            "name": "armadillo_collision_hull.obj",
+            "bytes": 46908
+          },
+          {
+            "name": "armadillo_collision_box.obj",
+            "bytes": 834
+          },
+          {
+            "name": "armadillo_collision_simplified.obj",
+            "bytes": 15754
+          },
+          {
+            "name": "report.html",
+            "bytes": 8350
+          },
+          {
+            "name": "recipe.json",
+            "bytes": 1529
+          }
+        ],
+        "total_bytes": 9134853,
+        "main_bytes": 2336684
+      },
+      "deviation": {
+        "mean": 0.00014360317,
+        "p95": 0.0005268519,
+        "max": 0.0016046886,
+        "samples": 49072,
+        "source_to_result_mean": 0.00022910656,
+        "source_to_result_p95": 0.0006987738
+      },
+      "edges": {
+        "open": 0,
+        "non_manifold": 0
+      },
+      "peak_rss_mb": 92.9
+    },
+    {
+      "id": "armadillo",
+      "preset": "mobile",
+      "tags": [
+        "scan",
+        "small",
+        "fast"
+      ],
+      "status": "ok",
+      "input": {
+        "path": "corpus/cache/armadillo.obj",
+        "triangles": 99976,
+        "vertices": 49990,
+        "bytes": 4634780
+      },
+      "load_s": 0.076,
+      "pipeline_s": 0.832,
+      "total_s": 0.909,
+      "timings": {
+        "analyze": 0.04,
+        "bake": 0.42,
+        "clean": 0.11,
+        "collision": 0.0,
+        "decimate": 0.08,
+        "export": 0.02,
+        "lods": 0.0,
+        "uv": 0.16
+      },
+      "output": {
+        "triangles": 1500,
+        "vertices": 1373,
+        "texture_size": 512,
+        "lods": [
+          750,
+          374
+        ],
+        "lod_count": 2,
+        "files": [
+          {
+            "name": "armadillo_albedo.png",
+            "bytes": 16028
+          },
+          {
+            "name": "armadillo_normal.png",
+            "bytes": 464713
+          },
+          {
+            "name": "armadillo.glb",
+            "bytes": 604192
+          },
+          {
+            "name": "armadillo_collision.glb",
+            "bytes": 22068
+          },
+          {
+            "name": "armadillo.mtl",
+            "bytes": 225
+          },
+          {
+            "name": "armadillo.obj",
+            "bytes": 186523
+          },
+          {
+            "name": "armadillo_LOD1.obj",
+            "bytes": 107048
+          },
+          {
+            "name": "armadillo_LOD2.obj",
+            "bytes": 63040
+          },
+          {
+            "name": "armadillo_collision_hull.obj",
+            "bytes": 9778
+          },
+          {
+            "name": "armadillo_collision_box.obj",
+            "bytes": 834
+          },
+          {
+            "name": "armadillo_collision_simplified.obj",
+            "bytes": 40660
+          },
+          {
+            "name": "report.html",
+            "bytes": 7965
+          },
+          {
+            "name": "recipe.json",
+            "bytes": 1520
+          }
+        ],
+        "total_bytes": 1524594,
+        "main_bytes": 604192
+      },
+      "deviation": {
+        "mean": 0.0016949849,
+        "p95": 0.006503411,
+        "max": 0.013721844,
+        "samples": 2873,
+        "source_to_result_mean": 0.002985657,
+        "source_to_result_p95": 0.007477802
+      },
+      "edges": {
+        "open": 0,
+        "non_manifold": 1
+      },
+      "peak_rss_mb": 90.2
+    },
+    {
+      "id": "armadillo",
+      "preset": "prop",
+      "tags": [
+        "scan",
+        "small",
+        "fast"
+      ],
+      "status": "ok",
+      "input": {
+        "path": "corpus/cache/armadillo.obj",
+        "triangles": 99976,
+        "vertices": 49990,
+        "bytes": 4634780
+      },
+      "load_s": 0.046,
+      "pipeline_s": 0.964,
+      "total_s": 1.01,
+      "timings": {
+        "analyze": 0.02,
+        "bake": 0.36,
+        "clean": 0.1,
+        "collision": 0.0,
+        "decimate": 0.07,
+        "export": 0.03,
+        "lods": 0.01,
+        "uv": 0.38
+      },
+      "output": {
+        "triangles": 5000,
+        "vertices": 3820,
+        "texture_size": 512,
+        "lods": [
+          2500,
+          1250,
+          500
+        ],
+        "lod_count": 3,
+        "files": [
+          {
+            "name": "armadillo_albedo.png",
+            "bytes": 11553
+          },
+          {
+            "name": "armadillo_normal.png",
+            "bytes": 460498
+          },
+          {
+            "name": "armadillo_orm.png",
+            "bytes": 6263
+          },
+          {
+            "name": "armadillo.glb",
+            "bytes": 856856
+          },
+          {
+            "name": "armadillo_collision.glb",
+            "bytes": 33232
+          },
+          {
+            "name": "armadillo.mtl",
+            "bytes": 297
+          },
+          {
+            "name": "armadillo.obj",
+            "bytes": 574701
+          },
+          {
+            "name": "armadillo_LOD1.obj",
+            "bytes": 320863
+          },
+          {
+            "name": "armadillo_LOD2.obj",
+            "bytes": 176592
+          },
+          {
+            "name": "armadillo_LOD3.obj",
+            "bytes": 84506
+          },
+          {
+            "name": "armadillo_collision_hull.obj",
+            "bytes": 17829
+          },
+          {
+            "name": "armadillo_collision_box.obj",
+            "bytes": 838
+          },
+          {
+            "name": "armadillo_collision_simplified.obj",
+            "bytes": 62659
+          },
+          {
+            "name": "report.html",
+            "bytes": 8337
+          },
+          {
+            "name": "recipe.json",
+            "bytes": 1528
+          }
+        ],
+        "total_bytes": 2616552,
+        "main_bytes": 856856
+      },
+      "deviation": {
+        "mean": 0.0006942964,
+        "p95": 0.0026279276,
+        "max": 0.00816083,
+        "samples": 8820,
+        "source_to_result_mean": 0.0011642264,
+        "source_to_result_p95": 0.0030468754
+      },
+      "edges": {
+        "open": 0,
+        "non_manifold": 0
+      },
+      "peak_rss_mb": 90.0
+    },
+    {
+      "id": "bunny",
+      "preset": "hero",
+      "tags": [
+        "scan",
+        "small",
+        "fast"
+      ],
+      "status": "ok",
+      "input": {
+        "path": "corpus/cache/stanford-bunny.obj",
+        "triangles": 69451,
+        "vertices": 34834,
+        "bytes": 2408417
+      },
+      "load_s": 0.056,
+      "pipeline_s": 18.135,
+      "total_s": 18.191,
+      "timings": {
+        "analyze": 0.02,
+        "bake": 0.3,
+        "clean": 0.07,
+        "collision": 0.02,
+        "decimate": 0.04,
+        "export": 0.07,
+        "lods": 0.05,
+        "uv": 17.56
+      },
+      "output": {
+        "triangles": 29999,
+        "vertices": 19948,
+        "texture_size": 512,
+        "lods": [
+          14999,
+          7499,
+          2999
+        ],
+        "lod_count": 3,
+        "files": [
+          {
+            "name": "bunny_albedo.png",
+            "bytes": 16195
+          },
+          {
+            "name": "bunny_normal.png",
+            "bytes": 209803
+          },
+          {
+            "name": "bunny_orm.png",
+            "bytes": 6263
+          },
+          {
+            "name": "bunny.glb",
+            "bytes": 2221292
+          },
+          {
+            "name": "bunny_collision.glb",
+            "bytes": 49368
+          },
+          {
+            "name": "bunny.mtl",
+            "bytes": 273
+          },
+          {
+            "name": "bunny.obj",
+            "bytes": 3330283
+          },
+          {
+            "name": "bunny_LOD1.obj",
+            "bytes": 1784298
+          },
+          {
+            "name": "bunny_LOD2.obj",
+            "bytes": 951696
+          },
+          {
+            "name": "bunny_LOD3.obj",
+            "bytes": 371443
+          },
+          {
+            "name": "bunny_collision_hull.obj",
+            "bytes": 100610
+          },
+          {
+            "name": "bunny_collision_box.obj",
+            "bytes": 796
+          },
+          {
+            "name": "bunny_collision_simplified.obj",
+            "bytes": 16338
+          },
+          {
+            "name": "report.html",
+            "bytes": 8241
+          },
+          {
+            "name": "recipe.json",
+            "bytes": 1529
+          }
+        ],
+        "total_bytes": 9068428,
+        "main_bytes": 2221292
+      },
+      "deviation": {
+        "mean": 0.00004497085,
+        "p95": 0.00021193027,
+        "max": 0.0007340066,
+        "samples": 49947,
+        "source_to_result_mean": 0.00008167398,
+        "source_to_result_p95": 0.0003078995
+      },
+      "edges": {
+        "open": 223,
+        "non_manifold": 0
+      },
+      "peak_rss_mb": 78.7
+    },
+    {
+      "id": "bunny",
+      "preset": "mobile",
+      "tags": [
+        "scan",
+        "small",
+        "fast"
+      ],
+      "status": "ok",
+      "input": {
+        "path": "corpus/cache/stanford-bunny.obj",
+        "triangles": 69451,
+        "vertices": 34834,
+        "bytes": 2408417
+      },
+      "load_s": 0.046,
+      "pipeline_s": 0.606,
+      "total_s": 0.652,
+      "timings": {
+        "analyze": 0.02,
+        "bake": 0.32,
+        "clean": 0.05,
+        "collision": 0.0,
+        "decimate": 0.04,
+        "export": 0.02,
+        "lods": 0.01,
+        "uv": 0.14
+      },
+      "output": {
+        "triangles": 1499,
+        "vertices": 1217,
+        "texture_size": 512,
+        "lods": [
+          749,
+          375
+        ],
+        "lod_count": 2,
+        "files": [
+          {
+            "name": "bunny_albedo.png",
+            "bytes": 22463
+          },
+          {
+            "name": "bunny_normal.png",
+            "bytes": 258520
+          },
+          {
+            "name": "bunny.glb",
+            "bytes": 393528
+          },
+          {
+            "name": "bunny_collision.glb",
+            "bytes": 20800
+          },
+          {
+            "name": "bunny.mtl",
+            "bytes": 209
+          },
+          {
+            "name": "bunny.obj",
+            "bytes": 167552
+          },
+          {
+            "name": "bunny_LOD1.obj",
+            "bytes": 95362
+          },
+          {
+            "name": "bunny_LOD2.obj",
+            "bytes": 54249
+          },
+          {
+            "name": "bunny_collision_hull.obj",
+            "bytes": 14681
+          },
+          {
+            "name": "bunny_collision_box.obj",
+            "bytes": 806
+          },
+          {
+            "name": "bunny_collision_simplified.obj",
+            "bytes": 30511
+          },
+          {
+            "name": "report.html",
+            "bytes": 7872
+          },
+          {
+            "name": "recipe.json",
+            "bytes": 1520
+          }
+        ],
+        "total_bytes": 1068073,
+        "main_bytes": 393528
+      },
+      "deviation": {
+        "mean": 0.0012203067,
+        "p95": 0.0048825317,
+        "max": 0.011400494,
+        "samples": 2716,
+        "source_to_result_mean": 0.0024362656,
+        "source_to_result_p95": 0.0064730197
+      },
+      "edges": {
+        "open": 223,
+        "non_manifold": 0
+      },
+      "peak_rss_mb": 82.3
+    },
+    {
+      "id": "bunny",
+      "preset": "prop",
+      "tags": [
+        "scan",
+        "small",
+        "fast"
+      ],
+      "status": "ok",
+      "input": {
+        "path": "corpus/cache/stanford-bunny.obj",
+        "triangles": 69451,
+        "vertices": 34834,
+        "bytes": 2408417
+      },
+      "load_s": 0.028,
+      "pipeline_s": 1.48,
+      "total_s": 1.508,
+      "timings": {
+        "analyze": 0.01,
+        "bake": 0.26,
+        "clean": 0.06,
+        "collision": 0.0,
+        "decimate": 0.04,
+        "export": 0.02,
+        "lods": 0.01,
+        "uv": 1.08
+      },
+      "output": {
+        "triangles": 4999,
+        "vertices": 3390,
+        "texture_size": 512,
+        "lods": [
+          2499,
+          1249,
+          499
+        ],
+        "lod_count": 3,
+        "files": [
+          {
+            "name": "bunny_albedo.png",
+            "bytes": 22089
+          },
+          {
+            "name": "bunny_normal.png",
+            "bytes": 249071
+          },
+          {
+            "name": "bunny_orm.png",
+            "bytes": 6263
+          },
+          {
+            "name": "bunny.glb",
+            "bytes": 620728
+          },
+          {
+            "name": "bunny_collision.glb",
+            "bytes": 28428
+          },
+          {
+            "name": "bunny.mtl",
+            "bytes": 273
+          },
+          {
+            "name": "bunny.obj",
+            "bytes": 527101
+          },
+          {
+            "name": "bunny_LOD1.obj",
+            "bytes": 284035
+          },
+          {
+            "name": "bunny_LOD2.obj",
+            "bytes": 152781
+          },
+          {
+            "name": "bunny_LOD3.obj",
+            "bytes": 70836
+          },
+          {
+            "name": "bunny_collision_hull.obj",
+            "bytes": 32404
+          },
+          {
+            "name": "bunny_collision_box.obj",
+            "bytes": 800
+          },
+          {
+            "name": "bunny_collision_simplified.obj",
+            "bytes": 32736
+          },
+          {
+            "name": "report.html",
+            "bytes": 8224
+          },
+          {
+            "name": "recipe.json",
+            "bytes": 1528
+          }
+        ],
+        "total_bytes": 2037297,
+        "main_bytes": 620728
+      },
+      "deviation": {
+        "mean": 0.00041088957,
+        "p95": 0.0015689275,
+        "max": 0.0034571525,
+        "samples": 8389,
+        "source_to_result_mean": 0.0006788529,
+        "source_to_result_p95": 0.0018159966
+      },
+      "edges": {
+        "open": 223,
+        "non_manifold": 0
+      },
+      "peak_rss_mb": 81.7
+    },
+    {
+      "id": "bunny_1m",
+      "preset": "hero",
+      "tags": [
+        "synth",
+        "ai",
+        "stress",
+        "fast"
+      ],
+      "status": "ok",
+      "input": {
+        "path": "corpus/cache/bunny_1m.ply",
+        "triangles": 1111366,
+        "vertices": 558373,
+        "bytes": 30082543
+      },
+      "load_s": 0.168,
+      "pipeline_s": 29.558,
+      "total_s": 29.726,
+      "timings": {
+        "analyze": 0.41,
+        "bake": 0.7,
+        "clean": 1.98,
+        "collision": 0.03,
+        "decimate": 1.34,
+        "export": 0.11,
+        "lods": 0.06,
+        "uv": 24.92
+      },
+      "output": {
+        "triangles": 30000,
+        "vertices": 22554,
+        "texture_size": 512,
+        "lods": [
+          15000,
+          7500,
+          3000
+        ],
+        "lod_count": 3,
+        "files": [
+          {
+            "name": "bunny_1m_albedo.png",
+            "bytes": 191004
+          },
+          {
+            "name": "bunny_1m_normal.png",
+            "bytes": 299260
+          },
+          {
+            "name": "bunny_1m_orm.png",
+            "bytes": 6263
+          },
+          {
+            "name": "bunny_1m.glb",
+            "bytes": 3458980
+          },
+          {
+            "name": "bunny_1m_collision.glb",
+            "bytes": 41556
+          },
+          {
+            "name": "bunny_1m.mtl",
+            "bytes": 291
+          },
+          {
+            "name": "bunny_1m.obj",
+            "bytes": 3757257
+          },
+          {
+            "name": "bunny_1m_LOD1.obj",
+            "bytes": 2096074
+          },
+          {
+            "name": "bunny_1m_LOD2.obj",
+            "bytes": 1111437
+          },
+          {
+            "name": "bunny_1m_LOD3.obj",
+            "bytes": 464613
+          },
+          {
+            "name": "bunny_1m_collision_hull.obj",
+            "bytes": 86363
+          },
+          {
+            "name": "bunny_1m_collision_box.obj",
+            "bytes": 867
+          },
+          {
+            "name": "bunny_1m_collision_simplified.obj",
+            "bytes": 16950
+          },
+          {
+            "name": "report.html",
+            "bytes": 8508
+          },
+          {
+            "name": "recipe.json",
+            "bytes": 1529
+          }
+        ],
+        "total_bytes": 11540952,
+        "main_bytes": 3458980
+      },
+      "deviation": {
+        "mean": 0.00008780604,
+        "p95": 0.00034475594,
+        "max": 0.0011748609,
+        "samples": 52554,
+        "source_to_result_mean": 0.00014769926,
+        "source_to_result_p95": 0.0004052092
+      },
+      "edges": {
+        "open": 892,
+        "non_manifold": 2
+      },
+      "peak_rss_mb": 350.0
+    },
+    {
+      "id": "bunny_1m",
+      "preset": "mobile",
+      "tags": [
+        "synth",
+        "ai",
+        "stress",
+        "fast"
+      ],
+      "status": "ok",
+      "input": {
+        "path": "corpus/cache/bunny_1m.ply",
+        "triangles": 1111366,
+        "vertices": 558373,
+        "bytes": 30082543
+      },
+      "load_s": 0.107,
+      "pipeline_s": 4.515,
+      "total_s": 4.622,
+      "timings": {
+        "analyze": 0.39,
+        "bake": 0.73,
+        "clean": 1.83,
+        "collision": 0.0,
+        "decimate": 1.35,
+        "export": 0.02,
+        "lods": 0.0,
+        "uv": 0.19
+      },
+      "output": {
+        "triangles": 1500,
+        "vertices": 1590,
+        "texture_size": 512,
+        "lods": [
+          750,
+          375
+        ],
+        "lod_count": 2,
+        "files": [
+          {
+            "name": "bunny_1m_albedo.png",
+            "bytes": 165132
+          },
+          {
+            "name": "bunny_1m_normal.png",
+            "bytes": 328881
+          },
+          {
+            "name": "bunny_1m.glb",
+            "bytes": 654860
+          },
+          {
+            "name": "bunny_1m_collision.glb",
+            "bytes": 19980
+          },
+          {
+            "name": "bunny_1m.mtl",
+            "bytes": 221
+          },
+          {
+            "name": "bunny_1m.obj",
+            "bytes": 212412
+          },
+          {
+            "name": "bunny_1m_LOD1.obj",
+            "bytes": 91140
+          },
+          {
+            "name": "bunny_1m_LOD2.obj",
+            "bytes": 45765
+          },
+          {
+            "name": "bunny_1m_collision_hull.obj",
+            "bytes": 10715
+          },
+          {
+            "name": "bunny_1m_collision_box.obj",
+            "bytes": 861
+          },
+          {
+            "name": "bunny_1m_collision_simplified.obj",
+            "bytes": 36800
+          },
+          {
+            "name": "report.html",
+            "bytes": 8125
+          },
+          {
+            "name": "recipe.json",
+            "bytes": 1520
+          }
+        ],
+        "total_bytes": 1576412,
+        "main_bytes": 654860
+      },
+      "deviation": {
+        "mean": 0.0013000598,
+        "p95": 0.007505349,
+        "max": 0.02119361,
+        "samples": 3090,
+        "source_to_result_mean": 0.004898249,
+        "source_to_result_p95": 0.012733113
+      },
+      "edges": {
+        "open": 892,
+        "non_manifold": 1
+      },
+      "peak_rss_mb": 359.9
+    },
+    {
+      "id": "bunny_1m",
+      "preset": "prop",
+      "tags": [
+        "synth",
+        "ai",
+        "stress",
+        "fast"
+      ],
+      "status": "ok",
+      "input": {
+        "path": "corpus/cache/bunny_1m.ply",
+        "triangles": 1111366,
+        "vertices": 558373,
+        "bytes": 30082543
+      },
+      "load_s": 0.114,
+      "pipeline_s": 5.723,
+      "total_s": 5.837,
+      "timings": {
+        "analyze": 0.34,
+        "bake": 0.96,
+        "clean": 1.74,
+        "collision": 0.01,
+        "decimate": 1.31,
+        "export": 0.03,
+        "lods": 0.01,
+        "uv": 1.33
+      },
+      "output": {
+        "triangles": 5000,
+        "vertices": 3790,
+        "texture_size": 512,
+        "lods": [
+          2500,
+          1250,
+          496
+        ],
+        "lod_count": 3,
+        "files": [
+          {
+            "name": "bunny_1m_albedo.png",
+            "bytes": 164244
+          },
+          {
+            "name": "bunny_1m_normal.png",
+            "bytes": 313570
+          },
+          {
+            "name": "bunny_1m_orm.png",
+            "bytes": 6263
+          },
+          {
+            "name": "bunny_1m.glb",
+            "bytes": 982616
+          },
+          {
+            "name": "bunny_1m_collision.glb",
+            "bytes": 29348
+          },
+          {
+            "name": "bunny_1m.mtl",
+            "bytes": 291
+          },
+          {
+            "name": "bunny_1m.obj",
+            "bytes": 589866
+          },
+          {
+            "name": "bunny_1m_LOD1.obj",
+            "bytes": 330508
+          },
+          {
+            "name": "bunny_1m_LOD2.obj",
+            "bytes": 187258
+          },
+          {
+            "name": "bunny_1m_LOD3.obj",
+            "bytes": 56680
+          },
+          {
+            "name": "bunny_1m_collision_hull.obj",
+            "bytes": 31001
+          },
+          {
+            "name": "bunny_1m_collision_box.obj",
+            "bytes": 857
+          },
+          {
+            "name": "bunny_1m_collision_simplified.obj",
+            "bytes": 42434
+          },
+          {
+            "name": "report.html",
+            "bytes": 8492
+          },
+          {
+            "name": "recipe.json",
+            "bytes": 1528
+          }
+        ],
+        "total_bytes": 2744956,
+        "main_bytes": 982616
+      },
+      "deviation": {
+        "mean": 0.0004728359,
+        "p95": 0.0019279625,
+        "max": 0.004553684,
+        "samples": 8790,
+        "source_to_result_mean": 0.0008499824,
+        "source_to_result_p95": 0.0022951227
+      },
+      "edges": {
+        "open": 892,
+        "non_manifold": 0
+      },
+      "peak_rss_mb": 374.2
+    },
+    {
+      "id": "damaged_helmet",
+      "preset": "hero",
+      "tags": [
+        "textured",
+        "pbr",
+        "glb",
+        "fast"
+      ],
+      "status": "ok",
+      "input": {
+        "path": "corpus/cache/DamagedHelmet.glb",
+        "triangles": 15452,
+        "vertices": 14556,
+        "bytes": 3773916
+      },
+      "load_s": 0.32,
+      "pipeline_s": 1.145,
+      "total_s": 1.465,
+      "timings": {
+        "analyze": 0.0,
+        "bake": 0.44,
+        "clean": 0.05,
+        "collision": 0.01,
+        "decimate": 0.0,
+        "export": 0.12,
+        "lods": 0.03,
+        "uv": 0.48
+      },
+      "output": {
+        "triangles": 15452,
+        "vertices": 13115,
+        "texture_size": 512,
+        "lods": [
+          7726,
+          3862,
+          1535
+        ],
+        "lod_count": 3,
+        "files": [
+          {
+            "name": "damaged_helmet_albedo.png",
+            "bytes": 640073
+          },
+          {
+            "name": "damaged_helmet_normal.png",
+            "bytes": 214244
+          },
+          {
+            "name": "damaged_helmet_orm.png",
+            "bytes": 484505
+          },
+          {
+            "name": "damaged_helmet.glb",
+            "bytes": 2550012
+          },
+          {
+            "name": "damaged_helmet_collision.glb",
+            "bytes": 29852
+          },
+          {
+            "name": "damaged_helmet.mtl",
+            "bytes": 317
+          },
+          {
+            "name": "damaged_helmet.obj",
+            "bytes": 2003175
+          },
+          {
+            "name": "damaged_helmet_LOD1.obj",
+            "bytes": 1115877
+          },
+          {
+            "name": "damaged_helmet_LOD2.obj",
+            "bytes": 650501
+          },
+          {
+            "name": "damaged_helmet_LOD3.obj",
+            "bytes": 149139
+          },
+          {
+            "name": "damaged_helmet_collision_hull.obj",
+            "bytes": 57883
+          },
+          {
+            "name": "damaged_helmet_collision_box.obj",
+            "bytes": 851
+          },
+          {
+            "name": "damaged_helmet_collision_simplified.obj",
+            "bytes": 12200
+          },
+          {
+            "name": "report.html",
+            "bytes": 8524
+          },
+          {
+            "name": "recipe.json",
+            "bytes": 1529
+          }
+        ],
+        "total_bytes": 7918682,
+        "main_bytes": 2550012
+      },
+      "deviation": {
+        "mean": 8.031094e-9,
+        "p95": 1.9220398e-8,
+        "max": 0.00008403547,
+        "samples": 28567,
+        "source_to_result_mean": 1.2157495e-14,
+        "source_to_result_p95": 0.0
+      },
+      "edges": {
+        "open": 1820,
+        "non_manifold": 7
+      },
+      "peak_rss_mb": 211.5
+    },
+    {
+      "id": "damaged_helmet",
+      "preset": "mobile",
+      "tags": [
+        "textured",
+        "pbr",
+        "glb",
+        "fast"
+      ],
+      "status": "ok",
+      "input": {
+        "path": "corpus/cache/DamagedHelmet.glb",
+        "triangles": 15452,
+        "vertices": 14556,
+        "bytes": 3773916
+      },
+      "load_s": 0.259,
+      "pipeline_s": 0.499,
+      "total_s": 0.758,
+      "timings": {
+        "analyze": 0.0,
+        "bake": 0.28,
+        "clean": 0.02,
+        "collision": 0.01,
+        "decimate": 0.01,
+        "export": 0.02,
+        "lods": 0.0,
+        "uv": 0.14
+      },
+      "output": {
+        "triangles": 1480,
+        "vertices": 2078,
+        "texture_size": 512,
+        "lods": [
+          736,
+          341
+        ],
+        "lod_count": 2,
+        "files": [
+          {
+            "name": "damaged_helmet_albedo.png",
+            "bytes": 602720
+          },
+          {
+            "name": "damaged_helmet_normal.png",
+            "bytes": 461213
+          },
+          {
+            "name": "damaged_helmet.glb",
+            "bytes": 1190444
+          },
+          {
+            "name": "damaged_helmet_collision.glb",
+            "bytes": 40240
+          },
+          {
+            "name": "damaged_helmet.mtl",
+            "bytes": 235
+          },
+          {
+            "name": "damaged_helmet.obj",
+            "bytes": 261979
+          },
+          {
+            "name": "damaged_helmet_LOD1.obj",
+            "bytes": 82302
+          },
+          {
+            "name": "damaged_helmet_LOD2.obj",
+            "bytes": 33602
+          },
+          {
+            "name": "damaged_helmet_collision_hull.obj",
+            "bytes": 20298
+          },
+          {
+            "name": "damaged_helmet_collision_box.obj",
+            "bytes": 835
+          },
+          {
+            "name": "damaged_helmet_collision_simplified.obj",
+            "bytes": 84314
+          },
+          {
+            "name": "report.html",
+            "bytes": 8160
+          },
+          {
+            "name": "recipe.json",
+            "bytes": 1520
+          }
+        ],
+        "total_bytes": 2787862,
+        "main_bytes": 1190444
+      },
+      "deviation": {
+        "mean": 0.00171934,
+        "p95": 0.009762086,
+        "max": 0.0639093,
+        "samples": 3558,
+        "source_to_result_mean": 0.010698586,
+        "source_to_result_p95": 0.037648626
+      },
+      "edges": {
+        "open": 1223,
+        "non_manifold": 24
+      },
+      "peak_rss_mb": 215.4
+    },
+    {
+      "id": "damaged_helmet",
+      "preset": "prop",
+      "tags": [
+        "textured",
+        "pbr",
+        "glb",
+        "fast"
+      ],
+      "status": "ok",
+      "input": {
+        "path": "corpus/cache/DamagedHelmet.glb",
+        "triangles": 15452,
+        "vertices": 14556,
+        "bytes": 3773916
+      },
+      "load_s": 0.299,
+      "pipeline_s": 0.521,
+      "total_s": 0.82,
+      "timings": {
+        "analyze": 0.0,
+        "bake": 0.22,
+        "clean": 0.02,
+        "collision": 0.0,
+        "decimate": 0.01,
+        "export": 0.04,
+        "lods": 0.01,
+        "uv": 0.22
+      },
+      "output": {
+        "triangles": 5000,
+        "vertices": 5574,
+        "texture_size": 512,
+        "lods": [
+          2882,
+          1193,
+          469
+        ],
+        "lod_count": 3,
+        "files": [
+          {
+            "name": "damaged_helmet_albedo.png",
+            "bytes": 630355
+          },
+          {
+            "name": "damaged_helmet_normal.png",
+            "bytes": 383609
+          },
+          {
+            "name": "damaged_helmet_orm.png",
+            "bytes": 479179
+          },
+          {
+            "name": "damaged_helmet.glb",
+            "bytes": 1950404
+          },
+          {
+            "name": "damaged_helmet_collision.glb",
+            "bytes": 17924
+          },
+          {
+            "name": "damaged_helmet.mtl",
+            "bytes": 317
+          },
+          {
+            "name": "damaged_helmet.obj",
+            "bytes": 761890
+          },
+          {
+            "name": "damaged_helmet_LOD1.obj",
+            "bytes": 506202
+          },
+          {
+            "name": "damaged_helmet_LOD2.obj",
+            "bytes": 116267
+          },
+          {
+            "name": "damaged_helmet_LOD3.obj",
+            "bytes": 47304
+          },
+          {
+            "name": "damaged_helmet_collision_hull.obj",
+            "bytes": 26004
+          },
+          {
+            "name": "damaged_helmet_collision_box.obj",
+            "bytes": 857
+          },
+          {
+            "name": "damaged_helmet_collision_simplified.obj",
+            "bytes": 11813
+          },
+          {
+            "name": "report.html",
+            "bytes": 8557
+          },
+          {
+            "name": "recipe.json",
+            "bytes": 1528
+          }
+        ],
+        "total_bytes": 4942210,
+        "main_bytes": 1950404
+      },
+      "deviation": {
+        "mean": 0.0003692703,
+        "p95": 0.0020634572,
+        "max": 0.008374495,
+        "samples": 10574,
+        "source_to_result_mean": 0.0009986811,
+        "source_to_result_p95": 0.0035368416
+      },
+      "edges": {
+        "open": 1820,
+        "non_manifold": 4
+      },
+      "peak_rss_mb": 215.4
+    }
+  ]
+}
