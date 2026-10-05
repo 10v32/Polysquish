@@ -13,6 +13,7 @@ pub mod recipe;
 pub mod pipeline;
 pub mod report;
 pub mod synth;
+pub mod voxel;
 pub mod progress;
 pub mod server;
 

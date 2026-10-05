@@ -1,6 +1,13 @@
 //! Fast PLY import (ascii, binary little/big endian) supporting positions, normals,
 //! vertex colours and UVs, plus `vertex_indices` faces (triangulated by fan).
+//!
+//! A PLY without a face element (or with zero faces) loads as a point cloud: positions and
+//! attributes, no indices (see `io::pointcloud::is_point_cloud`). 3D Gaussian splat PLYs
+//! (`f_dc_0..2`, `opacity`, `scale_0..2`, `rot_0..3`) are recognised: the DC colour term becomes
+//! the vertex colour and transparent or oversized splats are dropped by
+//! `io::pointcloud::filter_splats`.
 
+use super::pointcloud::{self, SplatAux};
 use crate::mesh::{Mesh, Scene};
 use anyhow::{anyhow, bail, Context, Result};
 use glam::{Vec2, Vec3};
@@ -148,14 +155,20 @@ pub fn load(path: &Path) -> Result<Scene> {
     }
 
     let mut mesh = Mesh::default();
+    let mut aux = SplatAux::default();
     let body = &data[header_end..];
 
     match format {
-        Format::Ascii => parse_ascii(body, &elements, &mut mesh)?,
+        Format::Ascii => parse_ascii(body, &elements, &mut mesh, &mut aux)?,
         Format::BinaryLe | Format::BinaryBe => {
             let mut cur = Cursor { data: body, pos: 0, be: format == Format::BinaryBe };
-            parse_binary(&mut cur, &elements, &mut mesh)?
+            parse_binary(&mut cur, &elements, &mut mesh, &mut aux)?
         }
+    }
+    if mesh.indices.is_empty() && aux.opacity.len() == mesh.positions.len() && !aux.opacity.is_empty() {
+        let n = mesh.positions.len();
+        let dropped = pointcloud::filter_splats(&mut mesh, &aux);
+        log::info!("{}: Gaussian splat PLY, dropped {dropped} of {n} splats (transparent or oversized)", path.display());
     }
     Ok(Scene { mesh, ..Default::default() })
 }
@@ -186,6 +199,14 @@ struct VertexLayout {
     u: Option<usize>,
     v: Option<usize>,
     color_is_byte: bool,
+    /// Present for 3D Gaussian splat vertices.
+    splat: Option<SplatLayout>,
+}
+
+struct SplatLayout {
+    f_dc: [usize; 3],
+    opacity: Option<usize>,
+    scale: [Option<usize>; 3],
 }
 
 fn layout(el: &Element) -> VertexLayout {
@@ -194,6 +215,14 @@ fn layout(el: &Element) -> VertexLayout {
     let color_is_byte = r
         .map(|i| matches!(el.props[i].ty, Ty::U8 | Ty::I8 | Ty::U16 | Ty::I16 | Ty::I32 | Ty::U32))
         .unwrap_or(true);
+    let splat = match (find(&["f_dc_0"]), find(&["f_dc_1"]), find(&["f_dc_2"])) {
+        (Some(a), Some(b), Some(c)) => Some(SplatLayout {
+            f_dc: [a, b, c],
+            opacity: find(&["opacity"]),
+            scale: [find(&["scale_0"]), find(&["scale_1"]), find(&["scale_2"])],
+        }),
+        _ => None,
+    };
     VertexLayout {
         x: find(&["x"]),
         y: find(&["y"]),
@@ -208,10 +237,11 @@ fn layout(el: &Element) -> VertexLayout {
         u: find(&["u", "s", "texture_u", "texture_s"]),
         v: find(&["v", "t", "texture_v", "texture_t"]),
         color_is_byte,
+        splat,
     }
 }
 
-fn push_vertex(mesh: &mut Mesh, lay: &VertexLayout, vals: &[f64]) {
+fn push_vertex(mesh: &mut Mesh, lay: &VertexLayout, vals: &[f64], aux: &mut SplatAux) {
     let g = |i: Option<usize>| i.map(|i| vals[i] as f32).unwrap_or(0.0);
     mesh.positions.push(Vec3::new(g(lay.x), g(lay.y), g(lay.z)));
     if lay.nx.is_some() {
@@ -221,6 +251,13 @@ fn push_vertex(mesh: &mut Mesh, lay: &VertexLayout, vals: &[f64]) {
         let s = if lay.color_is_byte { 1.0 / 255.0 } else { 1.0 };
         let a = if lay.a.is_some() { g(lay.a) * s } else { 1.0 };
         mesh.colors.push([g(lay.r) * s, g(lay.g) * s, g(lay.b) * s, a]);
+    } else if let Some(sp) = &lay.splat {
+        mesh.colors.push(pointcloud::sh_dc_to_color([g(Some(sp.f_dc[0])), g(Some(sp.f_dc[1])), g(Some(sp.f_dc[2]))]));
+    }
+    if let Some(sp) = &lay.splat {
+        aux.opacity.push(sp.opacity.map(|i| pointcloud::sigmoid(vals[i] as f32)).unwrap_or(1.0));
+        let scale = sp.scale.iter().filter_map(|i| i.map(|i| (vals[i] as f32).exp())).fold(0.0f32, f32::max);
+        aux.max_scale.push(scale);
     }
     if lay.u.is_some() {
         mesh.uvs.push(Vec2::new(g(lay.u), 1.0 - g(lay.v)));
@@ -238,7 +275,7 @@ fn push_face(mesh: &mut Mesh, idx: &[u32]) {
     }
 }
 
-fn parse_binary(cur: &mut Cursor, elements: &[Element], mesh: &mut Mesh) -> Result<()> {
+fn parse_binary(cur: &mut Cursor, elements: &[Element], mesh: &mut Mesh, aux: &mut SplatAux) -> Result<()> {
     let mut vals: Vec<f64> = Vec::new();
     let mut idx: Vec<u32> = Vec::new();
     for el in elements {
@@ -259,7 +296,7 @@ fn parse_binary(cur: &mut Cursor, elements: &[Element], mesh: &mut Mesh) -> Resu
                             vals.push(cur.read(p.ty)?);
                         }
                     }
-                    push_vertex(mesh, &lay, &vals);
+                    push_vertex(mesh, &lay, &vals, aux);
                 }
             }
             "face" => {
@@ -305,7 +342,7 @@ fn parse_binary(cur: &mut Cursor, elements: &[Element], mesh: &mut Mesh) -> Resu
     Ok(())
 }
 
-fn parse_ascii(body: &[u8], elements: &[Element], mesh: &mut Mesh) -> Result<()> {
+fn parse_ascii(body: &[u8], elements: &[Element], mesh: &mut Mesh, aux: &mut SplatAux) -> Result<()> {
     let text = std::str::from_utf8(body).context("ASCII PLY body is not UTF-8")?;
     let mut lines = text.lines().filter(|l| !l.trim().is_empty());
     let mut vals: Vec<f64> = Vec::new();
@@ -329,7 +366,7 @@ fn parse_ascii(body: &[u8], elements: &[Element], mesh: &mut Mesh) -> Result<()>
                             vals.push(toks.next().unwrap_or("0").parse().unwrap_or(0.0));
                         }
                     }
-                    push_vertex(mesh, &lay, &vals);
+                    push_vertex(mesh, &lay, &vals, aux);
                 }
                 "face" => {
                     for p in &el.props {
