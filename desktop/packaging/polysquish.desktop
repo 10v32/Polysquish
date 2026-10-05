@@ -1,0 +1,9 @@
+[Desktop Entry]
+Type=Application
+Name=Polysquish
+Comment=Squish multi-million-polygon AI-generated 3D models into game-ready meshes
+Exec=Polysquish
+Icon=polysquish
+Categories=Graphics;3DGraphics;
+Terminal=false
+StartupWMClass=Polysquish

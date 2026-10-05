@@ -1,0 +1,27 @@
+[package]
+name = "polysquish-desktop"
+version = "0.1.0"
+edition = "2021"
+description = "Polysquish in a native desktop window (embedded server + system WebView)"
+license = "MIT"
+build = "build.rs"
+publish = false
+
+[[bin]]
+name = "Polysquish"
+path = "src/main.rs"
+
+[dependencies]
+polysquish = { path = ".." }
+anyhow = "1"
+tokio = { version = "1", features = ["rt-multi-thread"] }
+wry = "0.57"
+tao = "0.37"
+open = "5"
+
+[build-dependencies]
+image = { version = "0.25", default-features = false, features = ["png"] }
+ico = "0.5"
+
+[target.'cfg(windows)'.build-dependencies]
+embed-resource = "3"
