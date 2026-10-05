@@ -326,6 +326,26 @@ impl Bvh {
         false
     }
 
+    /// Flatten the tree into plain GPU-friendly buffers (see [`FlatBvh`]). The BVH itself is
+    /// unchanged; the layout mirrors the traversal used by [`Bvh::intersect`].
+    pub fn flatten(&self) -> FlatBvh {
+        let mut node_bounds = Vec::with_capacity(self.nodes.len() * 2);
+        let mut node_info = Vec::with_capacity(self.nodes.len() * 2);
+        for n in &self.nodes {
+            node_bounds.push([n.bmin.x, n.bmin.y, n.bmin.z, 0.0]);
+            node_bounds.push([n.bmax.x, n.bmax.y, n.bmax.z, 0.0]);
+            node_info.push(n.first);
+            node_info.push(n.count);
+        }
+        let mut tris = Vec::with_capacity(self.tris.len() * 3);
+        for t in &self.tris {
+            tris.push([t.p0.x, t.p0.y, t.p0.z, 0.0]);
+            tris.push([t.e1.x, t.e1.y, t.e1.z, 0.0]);
+            tris.push([t.e2.x, t.e2.y, t.e2.z, 0.0]);
+        }
+        FlatBvh { node_bounds, node_info, tris, tri_order: self.tri_order.clone() }
+    }
+
     pub fn node_count(&self) -> usize {
         self.nodes.len()
     }
@@ -433,6 +453,31 @@ impl Bvh {
             }
         }
         best
+    }
+}
+
+/// A [`Bvh`] flattened into plain buffers for upload to a GPU (or any other consumer that wants
+/// contiguous data). All indices refer to the original mesh triangle order.
+#[derive(Clone, Debug, Default)]
+pub struct FlatBvh {
+    /// Two entries per node: `[bmin.x, bmin.y, bmin.z, 0]` then `[bmax.x, bmax.y, bmax.z, 0]`.
+    pub node_bounds: Vec<[f32; 4]>,
+    /// Two entries per node: `first`, `count`. `count > 0` marks a leaf whose triangles are
+    /// `tri_order[first..first + count]`; otherwise `first` is the left child and `first + 1`
+    /// the right child. Node 0 is the root.
+    pub node_info: Vec<u32>,
+    /// Three entries per triangle: `p0`, `e1 = p1 - p0`, `e2 = p2 - p0` (w = 0).
+    pub tris: Vec<[f32; 4]>,
+    /// Leaf triangle indices (see `node_info`).
+    pub tri_order: Vec<u32>,
+}
+
+impl FlatBvh {
+    pub fn node_count(&self) -> usize {
+        self.node_info.len() / 2
+    }
+    pub fn triangle_count(&self) -> usize {
+        self.tris.len() / 3
     }
 }
 

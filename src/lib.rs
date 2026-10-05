@@ -7,6 +7,7 @@ pub mod clean;
 pub mod decimate;
 pub mod uv;
 pub mod bvh;
+pub mod gpu;
 pub mod bake;
 pub mod collision;
 pub mod recipe;
