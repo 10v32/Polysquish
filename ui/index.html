@@ -49,6 +49,16 @@
       </span>
     </a>
     <div class="topbar-right">
+      <nav class="topnav" aria-label="Sections">
+        <button class="btn btn-ghost btn-sm nav-btn" id="nav-queue" type="button" aria-pressed="false">
+          <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 6h16M4 12h16M4 18h10"/></svg>
+          <span>Queue</span><span class="nav-count" id="nav-queue-count" hidden>0</span>
+        </button>
+        <button class="btn btn-ghost btn-sm nav-btn" id="nav-watch" type="button" aria-pressed="false">
+          <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg>
+          <span>Watch a folder</span><span class="nav-count" id="nav-watch-count" hidden>0</span>
+        </button>
+      </nav>
       <span class="chip chip-ghost" id="mock-badge" hidden>Mock mode</span>
       <span class="chip chip-ghost" id="version-chip" title="Backend version">…</span>
     </div>
@@ -62,7 +72,7 @@
         <h1 class="hero-title">Turn a <span class="grad-text">million-polygon</span> blob into a mesh your engine will love.</h1>
         <p class="hero-sub">Cleanup, decimation, UVs, baked textures, LODs and collision — in one squish.</p>
 
-        <div class="dropzone" id="dropzone" tabindex="0" role="button" aria-label="Drop your model here or press Enter to browse">
+        <div class="dropzone" id="dropzone" tabindex="0" role="button" aria-label="Drop one or more models here or press Enter to browse">
           <div class="dropzone-inner">
             <div class="drop-icon" aria-hidden="true">
               <svg viewBox="0 0 64 64" width="64" height="64">
@@ -81,7 +91,7 @@
             <p class="drop-formats">
               <span class="fmt">.obj</span><span class="fmt">.ply</span><span class="fmt">.stl</span><span class="fmt">.glb</span><span class="fmt">.gltf</span>
             </p>
-            <p class="drop-hint">Bring the <code>.mtl</code> and textures along if you have them.</p>
+            <p class="drop-hint">Bring the <code>.mtl</code> and textures along if you have them. Drop several models to squish them as a batch.</p>
             <div class="drop-actions">
               <button class="btn btn-primary" id="browse-btn" type="button">Browse files</button>
               <button class="btn btn-link" id="path-toggle" type="button" aria-expanded="false" aria-controls="path-row">or paste a file path</button>
@@ -138,7 +148,8 @@
             <div id="problems-body"></div>
           </section>
         </div>
-        <div class="col col-recipe">
+        <div class="col col-recipe" id="inspect-recipe-slot">
+          <div class="recipe-block" id="recipe-block">
           <section class="card" aria-labelledby="preset-heading">
             <div class="card-head">
               <h2 class="card-title" id="preset-heading">Pick a preset</h2>
@@ -154,6 +165,7 @@
             </button>
             <div class="adv-panel" id="adv-panel" hidden></div>
           </section>
+          </div>
           <section class="card squish-card">
             <label class="field">
               <span class="field-label">Output name</span>
@@ -166,6 +178,131 @@
               <span>Squish it</span>
             </button>
             <p class="squish-note" id="squish-note">Output goes to a new folder under your Polysquish output root.</p>
+          </section>
+        </div>
+      </div>
+    </section>
+
+    <!-- 2b. Batch -->
+    <section class="view" id="view-batch" data-view="batch" hidden>
+      <div class="view-head">
+        <div>
+          <p class="eyebrow">Step 2 · Batch</p>
+          <h1 class="view-title" id="batch-title">Squish <span class="grad-text" id="batch-count">3 models</span> in one go</h1>
+        </div>
+        <button class="btn btn-ghost" id="batch-back" type="button">← Choose other files</button>
+      </div>
+      <div class="inspect-grid">
+        <div class="col">
+          <section class="card" aria-labelledby="batch-files-heading">
+            <div class="card-head">
+              <h2 class="card-title" id="batch-files-heading">Models in this batch</h2>
+              <span class="chip chip-ghost" id="batch-size-chip">…</span>
+            </div>
+            <ul class="batch-list" id="batch-list"></ul>
+            <p class="batch-note">Sidecar <code>.mtl</code> files and textures are grouped with the model that shares their name. Each model is uploaded on its own, then the whole batch is queued and squished one after another.</p>
+          </section>
+        </div>
+        <div class="col" id="batch-recipe-slot">
+          <section class="card squish-card">
+            <button class="btn btn-primary btn-huge" id="batch-squish-btn" type="button">
+              <span class="btn-huge-ico" aria-hidden="true">
+                <svg viewBox="0 0 24 24" width="26" height="26"><path d="M12 3l2.4 5.2L20 9l-4 3.9.9 5.6L12 15.8 7.1 18.5 8 12.9 4 9l5.6-.8z" fill="currentColor"/></svg>
+              </span>
+              <span>Squish all</span>
+            </button>
+            <p class="squish-note" id="batch-note">Each model gets its own folder under your Polysquish output root.</p>
+          </section>
+        </div>
+      </div>
+    </section>
+
+    <!-- Queue -->
+    <section class="view" id="view-queue" data-view="queue" hidden>
+      <div class="view-head">
+        <div>
+          <p class="eyebrow">Queue</p>
+          <h1 class="view-title">Jobs <span class="grad-text" id="queue-headline">—</span></h1>
+        </div>
+        <button class="btn btn-ghost" id="queue-back" type="button">← Back</button>
+      </div>
+      <section class="card progress-card" id="queue-overall-card">
+        <div class="progress-status">
+          <div class="progress-label">
+            <span class="spinner" id="queue-spinner" aria-hidden="true"></span>
+            <span id="queue-status-label" aria-live="polite">Loading the queue…</span>
+          </div>
+          <div class="progress-meta">
+            <span id="queue-pct">0%</span>
+            <span class="dot-sep" aria-hidden="true">·</span>
+            <span id="queue-counts">0 of 0 done</span>
+          </div>
+        </div>
+        <div class="bar" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0" id="queue-bar">
+          <div class="bar-fill" id="queue-fill"></div>
+        </div>
+      </section>
+      <section class="card stack-gap" aria-labelledby="queue-jobs-heading">
+        <div class="card-head">
+          <h2 class="card-title" id="queue-jobs-heading">Jobs</h2>
+          <span class="chip chip-ghost" id="queue-jobs-chip">…</span>
+        </div>
+        <ol class="job-rows" id="queue-rows"></ol>
+      </section>
+      <section class="card stack-gap" aria-labelledby="queue-results-heading" id="queue-results-card" hidden>
+        <div class="card-head">
+          <h2 class="card-title" id="queue-results-heading">Finished</h2>
+          <span class="chip chip-mint" id="queue-results-chip"></span>
+        </div>
+        <ul class="file-list" id="queue-results"></ul>
+      </section>
+    </section>
+
+    <!-- Watch folders -->
+    <section class="view" id="view-watch" data-view="watch" hidden>
+      <div class="view-head">
+        <div>
+          <p class="eyebrow">Automate</p>
+          <h1 class="view-title">Watch a <span class="grad-text">folder</span></h1>
+        </div>
+        <button class="btn btn-ghost" id="watch-back" type="button">← Back</button>
+      </div>
+      <div class="inspect-grid">
+        <div class="col">
+          <form class="card watch-form" id="watch-form" aria-labelledby="watch-new-heading">
+            <div class="card-head">
+              <h2 class="card-title" id="watch-new-heading">New watch</h2>
+            </div>
+            <p class="watch-intro">Every supported model that lands in the folder is squished automatically once it has finished copying. Files already there without an output are picked up too.</p>
+            <div class="field">
+              <label class="field-label" for="watch-folder">Folder to watch</label>
+              <div class="copy-row">
+                <input class="input mono" id="watch-folder" type="text" placeholder="/Users/me/Downloads/meshy" autocomplete="off" spellcheck="false" required>
+                <button class="btn btn-secondary" type="button" id="watch-folder-pick">Browse…</button>
+              </div>
+            </div>
+            <div class="field">
+              <label class="field-label" for="watch-output">Output folder <span class="opt">optional</span></label>
+              <div class="copy-row">
+                <input class="input mono" id="watch-output" type="text" placeholder="Default: your Polysquish output root" autocomplete="off" spellcheck="false">
+                <button class="btn btn-secondary" type="button" id="watch-output-pick">Browse…</button>
+              </div>
+            </div>
+            <div class="field">
+              <label class="field-label" for="watch-preset">Preset</label>
+              <select class="select" id="watch-preset"></select>
+              <p class="field-hint" id="watch-preset-hint"></p>
+            </div>
+            <button class="btn btn-primary" type="submit" id="watch-start">Start watching</button>
+          </form>
+        </div>
+        <div class="col">
+          <section class="card" aria-labelledby="watch-list-heading">
+            <div class="card-head">
+              <h2 class="card-title" id="watch-list-heading">Active watches</h2>
+              <span class="chip chip-ghost" id="watch-list-chip">…</span>
+            </div>
+            <ul class="watch-list" id="watch-list"></ul>
           </section>
         </div>
       </div>
@@ -215,6 +352,8 @@
         </div>
         <div class="head-actions">
           <a class="btn btn-primary" id="zip-btn" href="#" download>Download all (.zip)</a>
+          <button class="btn btn-secondary" id="resquish-btn" type="button" title="Back to the recipe with the same upload. Only the stages you change run again.">Tweak &amp; re-squish</button>
+          <button class="btn btn-ghost" id="results-queue-btn" type="button" hidden>← Back to queue</button>
           <button class="btn btn-ghost" id="again-btn" type="button">Squish another</button>
         </div>
       </div>
@@ -227,6 +366,13 @@
           </div>
           <div id="compare-body"></div>
         </section>
+        <section class="card" id="metrics-card" aria-labelledby="metrics-heading" hidden>
+          <div class="card-head">
+            <h2 class="card-title" id="metrics-heading">Quality</h2>
+            <div class="badge-row" id="metrics-badges"></div>
+          </div>
+          <div class="metric-grid" id="metrics-body"></div>
+        </section>
         <section class="card" aria-labelledby="lods-heading">
           <div class="card-head"><h2 class="card-title" id="lods-heading">LODs</h2></div>
           <div id="lods-body"></div>
@@ -238,16 +384,40 @@
         </div>
         <div class="col">
         <section class="card viewer-card results-viewer-card" aria-label="Before and after preview">
-          <div class="card-head">
-            <div class="seg" role="group" aria-label="Which model to show">
-              <button class="seg-btn" type="button" id="res-before" aria-pressed="false">Before</button>
-              <button class="seg-btn" type="button" id="res-after" aria-pressed="true">After</button>
+          <div class="card-head viewer-head">
+            <div class="seg" role="radiogroup" aria-label="Viewer mode" id="res-mode">
+              <button class="seg-btn" type="button" role="radio" data-mode="shaded" aria-checked="true">Shaded</button>
+              <button class="seg-btn" type="button" role="radio" data-mode="deviation" aria-checked="false">Deviation</button>
+              <button class="seg-btn" type="button" role="radio" data-mode="density" aria-checked="false">Texel density</button>
             </div>
-            <div class="seg" role="group" aria-label="Viewer options">
-              <button class="seg-btn" type="button" id="res-wire" aria-pressed="false">Wireframe</button>
+            <div class="viewer-head-right">
+              <div class="seg" role="group" aria-label="Which model to show" id="res-side-seg">
+                <button class="seg-btn" type="button" id="res-before" aria-pressed="false">Before</button>
+                <button class="seg-btn" type="button" id="res-after" aria-pressed="true">After</button>
+              </div>
+              <div class="seg" role="group" aria-label="Viewer options">
+                <button class="seg-btn" type="button" id="res-split" aria-pressed="false">Side by side</button>
+                <button class="seg-btn" type="button" id="res-wire" aria-pressed="false">Wireframe</button>
+              </div>
             </div>
           </div>
-          <div class="viewer" id="viewer-result"></div>
+          <div class="viewer-duo" id="viewer-duo">
+            <div class="viewer-pane" id="pane-before" hidden>
+              <span class="pane-tag">Before</span>
+              <div class="viewer" id="viewer-result-before" aria-label="Before preview"></div>
+            </div>
+            <div class="viewer-pane" id="pane-after">
+              <span class="pane-tag" id="pane-after-tag" hidden>After</span>
+              <div class="viewer" id="viewer-result" aria-label="Result preview"></div>
+              <div class="heat-legend" id="heat-legend" hidden>
+                <span class="heat-title" id="heat-title">Deviation</span>
+                <span class="heat-min" id="heat-min">0</span>
+                <span class="heat-ramp" aria-hidden="true"></span>
+                <span class="heat-max" id="heat-max">0</span>
+              </div>
+            </div>
+          </div>
+          <p class="viewer-note" id="viewer-note" hidden></p>
         </section>
         <section class="card" aria-labelledby="fixed-heading">
           <div class="card-head"><h2 class="card-title" id="fixed-heading">Problems fixed</h2></div>
@@ -255,12 +425,16 @@
         </section>
         </div>
         <section class="card files-card" aria-labelledby="files-heading">
-          <div class="card-head"><h2 class="card-title" id="files-heading">Output files</h2></div>
+          <div class="card-head">
+            <h2 class="card-title" id="files-heading">Output files</h2>
+            <div class="quick-dl" id="quick-dl" aria-label="Quick downloads"></div>
+          </div>
           <div class="field copy-field">
             <span class="field-label">Output folder</span>
             <div class="copy-row">
               <input class="input mono" id="output-dir" type="text" readonly>
               <button class="btn btn-secondary" id="copy-dir" type="button">Copy</button>
+              <button class="btn btn-secondary" id="open-dir" type="button" title="Reveal the folder in your file manager">Open folder</button>
             </div>
           </div>
           <ul class="file-list" id="file-list"></ul>
@@ -288,7 +462,29 @@
     <span>Everything runs locally on your machine.</span>
     <span class="dot-sep" aria-hidden="true">·</span>
     <span id="foot-threads"></span>
+    <span class="dot-sep" aria-hidden="true">·</span>
+    <span class="foot-gpu" id="foot-gpu" title="Ray tracer used for baking">…</span>
   </footer>
+
+  <dialog class="picker" id="fs-picker" aria-labelledby="fs-title">
+    <div class="picker-inner">
+      <div class="picker-head">
+        <h2 class="picker-title" id="fs-title">Pick a folder</h2>
+        <button class="toast-close" type="button" id="fs-close" aria-label="Close">×</button>
+      </div>
+      <nav class="crumbs" id="fs-crumbs" aria-label="Current path"></nav>
+      <div class="picker-body" id="fs-body" aria-busy="false">
+        <ul class="fs-list" id="fs-list"></ul>
+      </div>
+      <div class="picker-foot">
+        <span class="fs-summary" id="fs-summary"></span>
+        <div class="picker-actions">
+          <button class="btn btn-ghost btn-sm" type="button" id="fs-up">↑ Up</button>
+          <button class="btn btn-primary btn-sm" type="button" id="fs-use">Use this folder</button>
+        </div>
+      </div>
+    </div>
+  </dialog>
 
   <div class="toasts" id="toasts" aria-live="assertive" aria-relevant="additions"></div>
 
