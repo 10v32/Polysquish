@@ -6,6 +6,7 @@ pub mod stl;
 pub mod gltf_in;
 pub mod gltf_out;
 pub mod obj_out;
+pub mod fbx_out;
 
 use crate::mesh::Scene;
 use anyhow::{bail, Context, Result};
