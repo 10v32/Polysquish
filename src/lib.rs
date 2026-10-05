@@ -10,6 +10,7 @@ pub mod bvh;
 pub mod gpu;
 pub mod bake;
 pub mod collision;
+pub mod imposter;
 pub mod recipe;
 pub mod pipeline;
 pub mod report;
