@@ -14,6 +14,7 @@ pub mod recipe;
 pub mod pipeline;
 pub mod report;
 pub mod synth;
+pub mod retopo;
 pub mod progress;
 pub mod normals;
 pub mod metrics;
