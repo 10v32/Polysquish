@@ -7,12 +7,13 @@ pub mod gltf_in;
 pub mod gltf_out;
 pub mod obj_out;
 pub mod fbx_out;
+pub mod pointcloud;
 
 use crate::mesh::Scene;
 use anyhow::{bail, Context, Result};
 use std::path::Path;
 
-pub const IMPORT_EXTENSIONS: &[&str] = &["obj", "ply", "stl", "glb", "gltf"];
+pub const IMPORT_EXTENSIONS: &[&str] = &["obj", "ply", "stl", "glb", "gltf", "splat"];
 
 pub fn extension_of(path: &Path) -> String {
     path.extension()
@@ -26,6 +27,9 @@ pub fn is_supported(path: &Path) -> bool {
 }
 
 /// Load any supported model into a single merged `Scene`.
+///
+/// A PLY without faces or a `.splat` file yields a point cloud: positions (and colours/normals)
+/// but no indices. Check `pointcloud::is_point_cloud` before running mesh-only stages.
 pub fn load_scene(path: &Path) -> Result<Scene> {
     let ext = extension_of(path);
     let meta = std::fs::metadata(path).with_context(|| format!("cannot read {}", path.display()))?;
@@ -34,10 +38,11 @@ pub fn load_scene(path: &Path) -> Result<Scene> {
         "ply" => ply::load(path)?,
         "stl" => stl::load(path)?,
         "glb" | "gltf" => gltf_in::load(path)?,
-        other => bail!("unsupported file type .{other} (supported: obj, ply, stl, glb, gltf)"),
+        "splat" => pointcloud::load_splat(path)?,
+        other => bail!("unsupported file type .{other} (supported: obj, ply, stl, glb, gltf, splat)"),
     };
-    if scene.mesh.indices.is_empty() {
-        bail!("the file contains no triangles");
+    if scene.mesh.positions.is_empty() {
+        bail!("the file contains no geometry");
     }
     scene.source_format = ext;
     scene.source_bytes = meta.len();
