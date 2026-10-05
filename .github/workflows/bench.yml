@@ -1,0 +1,60 @@
+name: bench
+
+on:
+  workflow_dispatch:
+    inputs:
+      filter:
+        description: "Comma-separated ids/tags to run (empty = fast entries)"
+        required: false
+        default: "fast"
+      update_baseline:
+        description: "Also upload a refreshed corpus/baseline.json"
+        type: boolean
+        default: false
+  schedule:
+    # Mondays 04:17 UTC
+    - cron: "17 4 * * 1"
+
+jobs:
+  bench:
+    runs-on: ubuntu-latest
+    timeout-minutes: 180
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      - name: Cache corpus downloads
+        uses: actions/cache@v4
+        with:
+          path: corpus/cache
+          key: corpus-cache-${{ hashFiles('corpus/manifest.json') }}
+      - name: Run the benchmark
+        id: bench
+        continue-on-error: true
+        run: |
+          FILTER="${{ github.event.inputs.filter }}"
+          if [ -z "$FILTER" ]; then FILTER="fast"; fi
+          # 30% rather than the 15% default: hosted runners are noisy and the UV stage alone varies by ±25%.
+          ARGS="bench --quick --filter $FILTER --out bench_out --tolerance 0.3"
+          if [ "${{ github.event.inputs.update_baseline }}" = "true" ]; then ARGS="$ARGS --update-baseline"; fi
+          cargo run --release -- $ARGS
+      - name: Summary
+        if: always()
+        run: |
+          if [ -f bench_out/bench.md ]; then cat bench_out/bench.md >> "$GITHUB_STEP_SUMMARY"; fi
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: bench_out
+          path: |
+            bench_out/bench.json
+            bench_out/bench.md
+            bench_out/**/result.json
+            bench_out/**/report.html
+            corpus/baseline.json
+          if-no-files-found: warn
+      - name: Fail on regression
+        if: steps.bench.outcome == 'failure'
+        run: |
+          echo "::error::polysquish bench reported a regression (see bench.md in the summary)"
+          exit 1

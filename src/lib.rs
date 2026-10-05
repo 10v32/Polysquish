@@ -15,6 +15,7 @@ pub mod report;
 pub mod synth;
 pub mod progress;
 pub mod server;
+pub mod bench;
 
 pub use mesh::{Material, Mesh, Scene, Texture};
 pub use recipe::Recipe;
