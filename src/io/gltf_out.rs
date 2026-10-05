@@ -34,6 +34,17 @@ impl Default for GlbMaterial {
     }
 }
 
+/// An additional mesh node with its own material (e.g. an imposter card set).
+pub struct ExtraNode<'a> {
+    pub name: String,
+    pub mesh: &'a Mesh,
+    pub material: GlbMaterial,
+    /// Alpha-masked (cutout) material.
+    pub alpha_mask: bool,
+    /// Append this node to the LOD chain (after the last LOD).
+    pub as_last_lod: bool,
+}
+
 pub struct GlbScene<'a> {
     pub name: String,
     /// LOD0 first.
@@ -43,6 +54,7 @@ pub struct GlbScene<'a> {
     pub collision: Vec<(String, &'a Mesh)>,
     pub scale: f32,
     pub generator_note: String,
+    pub extras: Vec<ExtraNode<'a>>,
 }
 
 struct Builder {
@@ -130,38 +142,44 @@ pub fn encode(scene: &GlbScene) -> Result<Vec<u8>> {
     let mut meshes = Vec::new();
     let mut nodes = Vec::new();
 
-    // Material
-    let m = &scene.material;
-    let mut mat = json!({
-        "name": m.name,
-        "pbrMetallicRoughness": {
-            "baseColorFactor": m.base_color,
-            "metallicFactor": m.metallic,
-            "roughnessFactor": m.roughness
-        },
-        "doubleSided": m.double_sided
-    });
-    let mut add_tex = |b: &mut Builder, img: &RgbaImage, name: &str| -> Result<usize> {
-        let ii = b.push_image(img, name, &mut images)?;
-        textures.push(json!({ "source": ii, "sampler": 0 }));
-        Ok(textures.len() - 1)
-    };
-    if let Some(img) = &m.albedo {
-        let t = add_tex(&mut b, img, &format!("{}_albedo", scene.name))?;
-        mat["pbrMetallicRoughness"]["baseColorTexture"] = json!({ "index": t });
+    // Materials
+    fn build_material(b: &mut Builder, images: &mut Vec<Value>, textures: &mut Vec<Value>, m: &GlbMaterial, prefix: &str, alpha_mask: bool) -> Result<Value> {
+        let mut mat = json!({
+            "name": m.name,
+            "pbrMetallicRoughness": {
+                "baseColorFactor": m.base_color,
+                "metallicFactor": m.metallic,
+                "roughnessFactor": m.roughness
+            },
+            "doubleSided": m.double_sided
+        });
+        if alpha_mask {
+            mat["alphaMode"] = json!("MASK");
+            mat["alphaCutoff"] = json!(0.5);
+        }
+        let mut add_tex = |b: &mut Builder, img: &RgbaImage, name: &str| -> Result<usize> {
+            let ii = b.push_image(img, name, images)?;
+            textures.push(json!({ "source": ii, "sampler": 0 }));
+            Ok(textures.len() - 1)
+        };
+        if let Some(img) = &m.albedo {
+            let t = add_tex(b, img, &format!("{prefix}_albedo"))?;
+            mat["pbrMetallicRoughness"]["baseColorTexture"] = json!({ "index": t });
+        }
+        if let Some(img) = &m.orm {
+            let t = add_tex(b, img, &format!("{prefix}_orm"))?;
+            mat["pbrMetallicRoughness"]["metallicRoughnessTexture"] = json!({ "index": t });
+            mat["occlusionTexture"] = json!({ "index": t });
+            mat["pbrMetallicRoughness"]["metallicFactor"] = json!(1.0);
+            mat["pbrMetallicRoughness"]["roughnessFactor"] = json!(1.0);
+        }
+        if let Some(img) = &m.normal {
+            let t = add_tex(b, img, &format!("{prefix}_normal"))?;
+            mat["normalTexture"] = json!({ "index": t });
+        }
+        Ok(mat)
     }
-    if let Some(img) = &m.orm {
-        let t = add_tex(&mut b, img, &format!("{}_orm", scene.name))?;
-        mat["pbrMetallicRoughness"]["metallicRoughnessTexture"] = json!({ "index": t });
-        mat["occlusionTexture"] = json!({ "index": t });
-        // When a texture drives metal/rough, factors act as multipliers: use 1.0.
-        mat["pbrMetallicRoughness"]["metallicFactor"] = json!(1.0);
-        mat["pbrMetallicRoughness"]["roughnessFactor"] = json!(1.0);
-    }
-    if let Some(img) = &m.normal {
-        let t = add_tex(&mut b, img, &format!("{}_normal", scene.name))?;
-        mat["normalTexture"] = json!({ "index": t });
-    }
+    let mat = build_material(&mut b, &mut images, &mut textures, &scene.material, &scene.name, false)?;
     materials.push(mat);
 
     // LOD meshes and nodes
@@ -172,16 +190,35 @@ pub fn encode(scene: &GlbScene) -> Result<Vec<u8>> {
         nodes.push(json!({ "name": name, "mesh": mi }));
         lod_nodes.push(nodes.len() - 1);
     }
+    // Extra nodes (imposter cards etc.) with their own materials.
+    let mut extra_scene_nodes: Vec<usize> = Vec::new();
+    for ex in &scene.extras {
+        let mat = build_material(&mut b, &mut images, &mut textures, &ex.material, &ex.name, ex.alpha_mask)?;
+        materials.push(mat);
+        let mi = b.push_mesh(ex.mesh, scene.scale, Some(materials.len() - 1), &ex.name, &mut meshes);
+        nodes.push(json!({ "name": ex.name, "mesh": mi }));
+        if ex.as_last_lod {
+            lod_nodes.push(nodes.len() - 1);
+        } else {
+            extra_scene_nodes.push(nodes.len() - 1);
+        }
+    }
     let mut extensions_used: Vec<&str> = Vec::new();
     if lod_nodes.len() > 1 {
         let ids: Vec<usize> = lod_nodes[1..].to_vec();
-        let cov: Vec<f32> = scene.screen_coverage.clone();
+        let mut cov: Vec<f32> = scene.screen_coverage.clone();
+        while cov.len() < lod_nodes.len() {
+            let last = cov.last().copied().unwrap_or(1.0);
+            cov.push(last * 0.5);
+        }
+        cov.truncate(lod_nodes.len());
         nodes[lod_nodes[0]]["extensions"] = json!({ "MSFT_lod": { "ids": ids } });
         nodes[lod_nodes[0]]["extras"] = json!({ "MSFT_screencoverage": cov });
         extensions_used.push("MSFT_lod");
     }
     // Collision nodes
     let mut scene_nodes = vec![lod_nodes[0]];
+    scene_nodes.extend(extra_scene_nodes);
     for (name, mesh) in &scene.collision {
         let mi = b.push_mesh(mesh, scene.scale, None, name, &mut meshes);
         nodes.push(json!({ "name": name, "mesh": mi, "extras": { "collision": true } }));
@@ -236,5 +273,6 @@ pub fn encode_simple(name: &str, mesh: &Mesh, material: GlbMaterial) -> Result<V
         collision: vec![],
         scale: 1.0,
         generator_note: String::new(),
+        extras: vec![],
     })
 }

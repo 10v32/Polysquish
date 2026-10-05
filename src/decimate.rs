@@ -97,6 +97,7 @@ pub fn simplify_to(mesh: &Mesh, target_tris: usize, opts: &DecimateOptions, rela
     };
     let mut out = mesh.clone();
     out.indices = new_indices;
+    out.polygons.clear(); // collapses only track triangles
     if !out.material_ids.is_empty() {
         // Material ids cannot be tracked through collapses; most AI assets are single-material.
         // Keep the dominant material for all triangles.

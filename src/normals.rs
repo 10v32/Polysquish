@@ -68,15 +68,23 @@ pub fn corner_normals(mesh: &Mesh, angle_deg: f32) -> Vec<Vec3> {
 /// by more than a small tolerance become separate vertices. Sets `mesh.normals`. Returns the
 /// number of vertices added. Polygons are kept consistent by remapping their corners.
 pub fn split_hard_edges(mesh: &mut Mesh, angle_deg: f32) -> usize {
+    // A polygon list that no longer matches the triangle list (e.g. after decimation) is dropped.
+    if mesh.has_polygons() {
+        let tri_from_polys: usize = mesh.polygons.iter().map(|p| if p[3] == crate::mesh::NO_VERTEX { 1 } else { 2 }).sum();
+        if tri_from_polys != mesh.triangle_count() {
+            mesh.polygons.clear();
+        }
+    }
     let corners = corner_normals(mesh, angle_deg);
     let n = mesh.vertex_count();
     // Map (vertex, quantised normal) -> new vertex index.
     let mut map: HashMap<(u32, [i16; 3]), u32> = HashMap::with_capacity(n * 2);
-    let mut src_of: Vec<u32> = Vec::with_capacity(n + n / 4);
-    let mut new_normals: Vec<Vec3> = Vec::with_capacity(n + n / 4);
     let mut new_indices = vec![0u32; mesh.indices.len()];
     let quant = |v: Vec3| -> [i16; 3] { [(v.x * 2000.0) as i16, (v.y * 2000.0) as i16, (v.z * 2000.0) as i16] };
-    // Pre-seed so original vertex ids stay stable when possible (first normal seen wins slot v).
+    // Original vertex ids keep their slot (first normal seen wins it); further normals of the
+    // same vertex get fresh slots appended after `n`.
+    let mut src_of: Vec<u32> = (0..n as u32).collect();
+    let mut new_normals: Vec<Vec3> = vec![Vec3::Y; n];
     let mut first_slot_used = vec![false; n];
     for k in 0..mesh.indices.len() {
         let v = mesh.indices[k];
@@ -84,12 +92,6 @@ pub fn split_hard_edges(mesh: &mut Mesh, angle_deg: f32) -> usize {
         let idx = *map.entry(key).or_insert_with(|| {
             if !first_slot_used[v as usize] {
                 first_slot_used[v as usize] = true;
-                // reserve slot v
-                while src_of.len() <= v as usize {
-                    src_of.push(u32::MAX);
-                    new_normals.push(Vec3::ZERO);
-                }
-                src_of[v as usize] = v;
                 new_normals[v as usize] = corners[k];
                 v
             } else {
@@ -99,18 +101,6 @@ pub fn split_hard_edges(mesh: &mut Mesh, angle_deg: f32) -> usize {
             }
         });
         new_indices[k] = idx;
-    }
-    // Vertices never referenced keep their slot with a default normal.
-    while src_of.len() < n {
-        let v = src_of.len() as u32;
-        src_of.push(v);
-        new_normals.push(Vec3::Y);
-    }
-    for v in 0..n {
-        if src_of[v] == u32::MAX {
-            src_of[v] = v as u32;
-            new_normals[v] = Vec3::Y;
-        }
     }
     let total = src_of.len();
     let added = total - n;

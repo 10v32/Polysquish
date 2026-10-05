@@ -136,6 +136,38 @@ fn smoothed_normals(mesh: &Mesh, iterations: usize) -> Vec<glam::Vec3> {
     cur
 }
 
+/// xatlas keeps face order but re-indexes vertices; quads (triangulated as consecutive
+/// `(a,b,c),(a,c,d)`) are re-paired when both halves still share the diagonal, else kept as triangles.
+fn rebuild_polygons(old: &[[u32; 4]], new_indices: &[u32]) -> Vec<[u32; 4]> {
+    use crate::mesh::NO_VERTEX;
+    let mut out = Vec::with_capacity(old.len());
+    let mut t = 0usize;
+    for p in old {
+        if t * 3 + 3 > new_indices.len() {
+            break;
+        }
+        let (a, b, c) = (new_indices[t * 3], new_indices[t * 3 + 1], new_indices[t * 3 + 2]);
+        if p[3] == NO_VERTEX {
+            out.push([a, b, c, NO_VERTEX]);
+            t += 1;
+        } else {
+            if (t + 1) * 3 + 3 > new_indices.len() {
+                out.push([a, b, c, NO_VERTEX]);
+                break;
+            }
+            let (a2, c2, d) = (new_indices[(t + 1) * 3], new_indices[(t + 1) * 3 + 1], new_indices[(t + 1) * 3 + 2]);
+            if a2 == a && c2 == c {
+                out.push([a, b, c, d]);
+            } else {
+                out.push([a, b, c, NO_VERTEX]);
+                out.push([a2, c2, d, NO_VERTEX]);
+            }
+            t += 2;
+        }
+    }
+    out
+}
+
 #[inline]
 fn point_in_tri(p: Vec2, a: Vec2, b: Vec2, c: Vec2) -> bool {
     let d1 = (p - b).perp_dot(a - b);
@@ -245,6 +277,10 @@ pub fn unwrap(mesh: &mut Mesh, opts: &UvOptions) -> Result<UvReport> {
     }
     (new, charts, w, h, utilization)
     };
+    let mut new = new;
+    if mesh.has_polygons() {
+        new.polygons = rebuild_polygons(&mesh.polygons, &new.indices);
+    }
     *mesh = new;
     Ok(UvReport {
         charts,

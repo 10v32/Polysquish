@@ -176,3 +176,23 @@ fn hidden_inner_shell_is_removed_but_outer_kept() {
     let (_, comps) = polysquish::analyze::components(&outer);
     assert_eq!(comps, 1);
 }
+
+#[test]
+fn hard_edge_split_keeps_geometry_consistent() {
+    // A cube with 90° edges: every corner gets 3 normals, positions must be unchanged per index.
+    let mut m = polysquish::collision::bounding_box(&make_sphere(8));
+    let before = m.clone();
+    let added = polysquish::normals::split_hard_edges(&mut m, 60.0);
+    assert_eq!(m.vertex_count(), 24, "cube should split into 24 vertices (added {added})");
+    assert_eq!(m.triangle_count(), 12);
+    for t in 0..m.triangle_count() {
+        let [a, b, c] = m.tri(t);
+        let [oa, ob, oc] = before.tri(t);
+        assert_eq!(m.positions[a as usize], before.positions[oa as usize]);
+        assert_eq!(m.positions[b as usize], before.positions[ob as usize]);
+        assert_eq!(m.positions[c as usize], before.positions[oc as usize]);
+        // Vertex normal must match the face normal exactly on a cube.
+        let fnrm = m.face_normal(t);
+        assert!(m.normals[a as usize].dot(fnrm) > 0.999);
+    }
+}
