@@ -1,0 +1,16 @@
+{
+  "name": "com.polysquish.importer",
+  "version": "0.1.0",
+  "displayName": "Polysquish Importer",
+  "description": "Squish huge AI-generated meshes into game-ready assets from inside the Unity Editor. Runs the polysquish executable, copies the outputs into Assets/Polysquish/<name>/, fixes texture import settings and builds a LODGroup prefab.",
+  "unity": "2022.3",
+  "documentationUrl": "https://github.com/10v32/Polysquish",
+  "changelogUrl": "https://github.com/10v32/Polysquish/releases",
+  "licensesUrl": "https://github.com/10v32/Polysquish/blob/main/LICENSE",
+  "keywords": ["mesh", "decimation", "lod", "bake", "import", "ai"],
+  "author": {
+    "name": "Polysquish contributors",
+    "url": "https://github.com/10v32/Polysquish"
+  },
+  "hideInEditor": false
+}
